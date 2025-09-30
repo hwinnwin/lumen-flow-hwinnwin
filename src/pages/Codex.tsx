@@ -116,11 +116,28 @@ export default function Codex() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
-      const { data: projects } = await supabase
+      let { data: projects } = await supabase
         .from('projects')
         .select('id')
         .eq('user_id', user.id)
         .limit(1);
+      
+      // Auto-create a default project if none exists
+      if (!projects || projects.length === 0) {
+        const { data: newProject, error } = await supabase
+          .from('projects')
+          .insert({
+            user_id: user.id,
+            name: 'My Codex',
+            description: 'Default project for imported chats'
+          })
+          .select('id')
+          .single();
+        
+        if (!error && newProject) {
+          projects = [newProject];
+        }
+      }
       
       if (projects && projects.length > 0) {
         setSelectedProject(projects[0].id);
@@ -445,7 +462,6 @@ export default function Codex() {
             <Button 
               className="bg-gradient-primary text-primary-foreground shadow-royal"
               onClick={() => setIsImportDialogOpen(true)}
-              disabled={!selectedProject}
             >
               <Upload className="w-4 h-4 mr-2" />
               Import ChatGPT

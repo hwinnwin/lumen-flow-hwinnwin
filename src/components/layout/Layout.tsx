@@ -16,9 +16,9 @@ export function Layout({ children }: LayoutProps) {
         
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="h-16 border-b border-border bg-card shadow-card flex items-center justify-between px-6">
+          <header className="h-16 border-b border-border bg-card shadow-card flex items-center justify-between px-4 md:px-6">
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              <SidebarTrigger className="p-2 hover:bg-muted rounded-lg transition-smooth flex-shrink-0" />
+              <SidebarTrigger className="p-2 hover:bg-muted rounded-lg transition-smooth flex-shrink-0 hover-scale" />
               
               <div className="relative hidden md:block flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />

@@ -1,10 +1,16 @@
-import { useState } from "react";
-import { BookOpen, Search, Filter, Plus, Star, Copy, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
+import { BookOpen, Search, Filter, Plus, Star, Copy, ExternalLink, MessageSquare, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { ImportChatsDialog } from "@/components/codex/ImportChatsDialog";
+import { ChatCard } from "@/components/codex/ChatCard";
+import { ChatFilters } from "@/components/codex/ChatFilters";
+import type { ChakraCategory, Priority } from "@/lib/chakraSystem";
 
 const mockFrameworks = [
   {
@@ -77,10 +83,111 @@ const mockFrameworks = [
 
 const categories = ["All", "Productivity", "Strategy", "Innovation", "Decision Making"];
 
+interface Chat {
+  id: string;
+  title: string;
+  content: string;
+  chat_date: string;
+  chakra_category: ChakraCategory;
+  priority?: Priority;
+  status?: string;
+  tags?: string[];
+  starred?: boolean;
+  project_id: string;
+}
+
 export default function Codex() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [frameworks, setFrameworks] = useState(mockFrameworks);
+  
+  // Chat-related state
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [selectedChakra, setSelectedChakra] = useState<ChakraCategory | null>(null);
+  const [selectedPriority, setSelectedPriority] = useState<Priority | null>(null);
+  const [showStarred, setShowStarred] = useState(false);
+  
+  // Fetch user's first project for chat import
+  useEffect(() => {
+    const fetchProject = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+      
+      if (projects && projects.length > 0) {
+        setSelectedProject(projects[0].id);
+        fetchChats(projects[0].id);
+      }
+    };
+    
+    fetchProject();
+  }, []);
+  
+  const fetchChats = async (projectId: string) => {
+    const { data, error } = await supabase
+      .from('ai_chats')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('chat_date', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching chats:', error);
+      return;
+    }
+    
+    setChats((data || []) as Chat[]);
+  };
+  
+  const handleToggleStar = async (chatId: string) => {
+    const chat = chats.find(c => c.id === chatId);
+    if (!chat) return;
+    
+    const { error } = await supabase
+      .from('ai_chats')
+      .update({ starred: !chat.starred })
+      .eq('id', chatId);
+    
+    if (!error) {
+      setChats(chats.map(c => c.id === chatId ? { ...c, starred: !c.starred } : c));
+      toast({
+        title: chat.starred ? "Removed from starred" : "Starred",
+        description: chat.title,
+      });
+    }
+  };
+  
+  const handleDeleteChat = async (chatId: string) => {
+    const { error } = await supabase
+      .from('ai_chats')
+      .delete()
+      .eq('id', chatId);
+    
+    if (!error) {
+      setChats(chats.filter(c => c.id !== chatId));
+      toast({
+        title: "Chat deleted",
+        description: "The chat has been removed.",
+      });
+    }
+  };
+  
+  const filteredChats = chats.filter(chat => {
+    const matchesSearch = chat.title.toLowerCase().includes(chatSearchQuery.toLowerCase()) ||
+                         chat.content.toLowerCase().includes(chatSearchQuery.toLowerCase());
+    const matchesChakra = !selectedChakra || chat.chakra_category === selectedChakra;
+    const matchesPriority = !selectedPriority || chat.priority === selectedPriority;
+    const matchesStarred = !showStarred || chat.starred;
+    
+    return matchesSearch && matchesChakra && matchesPriority && matchesStarred;
+  });
 
   const filteredFrameworks = frameworks.filter(framework => {
     const matchesSearch = framework.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,202 +217,321 @@ export default function Codex() {
             Codex
           </h1>
           <p className="text-muted-foreground mt-1">
-            Your collection of frameworks, methodologies, and philosophies
+            Your collection of frameworks, methodologies, and AI conversations
           </p>
         </div>
-        <Button 
-          className="bg-gradient-primary text-primary-foreground shadow-royal"
-          onClick={() => toast({
-            title: "Add Framework",
-            description: "Framework creation coming soon with backend integration.",
-          })}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Framework
-        </Button>
       </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search frameworks, tags, or content..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-input border-border"
-          />
-        </div>
+      
+      <Tabs defaultValue="frameworks" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="frameworks">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Frameworks
+          </TabsTrigger>
+          <TabsTrigger value="chats">
+            <MessageSquare className="w-4 h-4 mr-2" />
+            AI Chats
+          </TabsTrigger>
+        </TabsList>
         
-        <div className="flex gap-2">
-          {categories.map((category) => (
-            <Button
-              key={category}
-              variant={selectedCategory === category ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedCategory(category)}
-              className={selectedCategory === category ? "bg-gradient-primary text-primary-foreground" : ""}
+        <TabsContent value="frameworks" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {frameworks.length} frameworks
+            </div>
+            <Button 
+              className="bg-gradient-primary text-primary-foreground shadow-royal"
+              onClick={() => toast({
+                title: "Add Framework",
+                description: "Framework creation coming soon with backend integration.",
+              })}
             >
-              {category}
+              <Plus className="w-4 h-4 mr-2" />
+              Add Framework
             </Button>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{frameworks.length}</p>
-                <p className="text-sm text-muted-foreground">Total Frameworks</p>
-              </div>
-              <BookOpen className="w-6 h-6 text-primary" />
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search frameworks, tags, or content..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-input border-border"
+              />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {frameworks.filter(f => f.isFavorite).length}
-                </p>
-                <p className="text-sm text-muted-foreground">Favorites</p>
-              </div>
-              <Star className="w-6 h-6 text-accent" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{categories.length - 1}</p>
-                <p className="text-sm text-muted-foreground">Categories</p>
-              </div>
-              <Filter className="w-6 h-6 text-primary-glow" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {Math.round(frameworks.reduce((acc, f) => acc + f.rating, 0) / frameworks.length * 10) / 10}
-                </p>
-                <p className="text-sm text-muted-foreground">Avg Rating</p>
-              </div>
-              <div className="w-6 h-6 rounded-full bg-primary-glow/20 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-primary-glow" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Frameworks Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredFrameworks.map((framework) => (
-          <Card key={framework.id} className="bg-card border-border shadow-card hover:shadow-glow transition-royal">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="secondary">{framework.category}</Badge>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Star className="w-4 h-4 text-accent" />
-                      {framework.rating}
-                    </div>
-                  </div>
-                  <CardTitle className="text-xl text-foreground mb-2">
-                    {framework.title}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    by {framework.author} • {framework.source}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleFavorite(framework.id)}
-                  className="p-2"
-                >
-                  <Star 
-                    className={`w-4 h-4 ${
-                      framework.isFavorite ? 'fill-accent text-accent' : 'text-muted-foreground'
-                    }`} 
-                  />
-                </Button>
-              </div>
-            </CardHeader>
             
-            <CardContent>
-              <p className="text-muted-foreground mb-4 leading-relaxed">
-                {framework.description}
-              </p>
-              
-              <div className="mb-4 p-4 rounded-lg bg-muted border border-border">
-                <p className="text-sm text-foreground whitespace-pre-line">
-                  {framework.content}
-                </p>
-              </div>
-              
-              <div className="flex flex-wrap gap-1 mb-4">
-                {framework.tags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1"
-                  onClick={() => {
-                    navigator.clipboard.writeText(framework.content);
-                    toast({
-                      title: "Copied to clipboard",
-                      description: framework.title,
-                    });
-                  }}
+            <div className="flex gap-2">
+              {categories.map((category) => (
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedCategory(category)}
+                  className={selectedCategory === category ? "bg-gradient-primary text-primary-foreground" : ""}
                 >
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy
+                  {category}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1"
-                  onClick={() => toast({
-                    title: "Share",
-                    description: "Sharing functionality coming soon.",
-                  })}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Share
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              ))}
+            </div>
+          </div>
 
-      {filteredFrameworks.length === 0 && (
-        <Card className="bg-card border-border shadow-card">
-          <CardContent className="p-12 text-center">
-            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">No frameworks found</h3>
-            <p className="text-muted-foreground">Try adjusting your search or filters</p>
-          </CardContent>
-        </Card>
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{frameworks.length}</p>
+                    <p className="text-sm text-muted-foreground">Total Frameworks</p>
+                  </div>
+                  <BookOpen className="w-6 h-6 text-primary" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {frameworks.filter(f => f.isFavorite).length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Favorites</p>
+                  </div>
+                  <Star className="w-6 h-6 text-accent" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{categories.length - 1}</p>
+                    <p className="text-sm text-muted-foreground">Categories</p>
+                  </div>
+                  <Filter className="w-6 h-6 text-primary-glow" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {Math.round(frameworks.reduce((acc, f) => acc + f.rating, 0) / frameworks.length * 10) / 10}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Avg Rating</p>
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-primary-glow/20 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-primary-glow" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Frameworks Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {filteredFrameworks.map((framework) => (
+              <Card key={framework.id} className="bg-card border-border shadow-card hover:shadow-glow transition-royal">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="secondary">{framework.category}</Badge>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Star className="w-4 h-4 text-accent" />
+                          {framework.rating}
+                        </div>
+                      </div>
+                      <CardTitle className="text-xl text-foreground mb-2">
+                        {framework.title}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        by {framework.author} • {framework.source}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleFavorite(framework.id)}
+                      className="p-2"
+                    >
+                      <Star 
+                        className={`w-4 h-4 ${
+                          framework.isFavorite ? 'fill-accent text-accent' : 'text-muted-foreground'
+                        }`} 
+                      />
+                    </Button>
+                  </div>
+                </CardHeader>
+                
+                <CardContent>
+                  <p className="text-muted-foreground mb-4 leading-relaxed">
+                    {framework.description}
+                  </p>
+                  
+                  <div className="mb-4 p-4 rounded-lg bg-muted border border-border">
+                    <p className="text-sm text-foreground whitespace-pre-line">
+                      {framework.content}
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1 mb-4">
+                    {framework.tags.map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => {
+                        navigator.clipboard.writeText(framework.content);
+                        toast({
+                          title: "Copied to clipboard",
+                          description: framework.title,
+                        });
+                      }}
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => toast({
+                        title: "Share",
+                        description: "Sharing functionality coming soon.",
+                      })}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Share
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {filteredFrameworks.length === 0 && (
+            <Card className="bg-card border-border shadow-card">
+              <CardContent className="p-12 text-center">
+                <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No frameworks found</h3>
+                <p className="text-muted-foreground">Try adjusting your search or filters</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="chats" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredChats.length} of {chats.length} chats
+            </div>
+            <Button 
+              className="bg-gradient-primary text-primary-foreground shadow-royal"
+              onClick={() => setIsImportDialogOpen(true)}
+              disabled={!selectedProject}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import ChatGPT
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-1">
+              <Card className="p-4 sticky top-4">
+                <ChatFilters
+                  searchQuery={chatSearchQuery}
+                  selectedChakra={selectedChakra}
+                  selectedPriority={selectedPriority}
+                  showStarred={showStarred}
+                  onSearchChange={setChatSearchQuery}
+                  onChakraSelect={setSelectedChakra}
+                  onPrioritySelect={setSelectedPriority}
+                  onToggleStarred={() => setShowStarred(!showStarred)}
+                  onClearFilters={() => {
+                    setChatSearchQuery("");
+                    setSelectedChakra(null);
+                    setSelectedPriority(null);
+                    setShowStarred(false);
+                  }}
+                />
+              </Card>
+            </div>
+            
+            <div className="lg:col-span-3 space-y-4">
+              {filteredChats.map((chat) => (
+                <ChatCard
+                  key={chat.id}
+                  id={chat.id}
+                  title={chat.title}
+                  content={chat.content}
+                  chatDate={chat.chat_date}
+                  chakraCategory={chat.chakra_category}
+                  priority={chat.priority}
+                  status={chat.status}
+                  tags={chat.tags}
+                  starred={chat.starred}
+                  onToggleStar={handleToggleStar}
+                  onEdit={(id) => toast({ title: "Edit", description: "Edit functionality coming soon" })}
+                  onDelete={handleDeleteChat}
+                  onClick={(id) => toast({ title: "View", description: "Detailed view coming soon" })}
+                />
+              ))}
+              
+              {filteredChats.length === 0 && chats.length > 0 && (
+                <Card className="p-12 text-center">
+                  <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No chats match your filters</h3>
+                  <p className="text-muted-foreground">Try adjusting your search or filters</p>
+                </Card>
+              )}
+              
+              {chats.length === 0 && (
+                <Card className="p-12 text-center">
+                  <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No chats imported yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Import your ChatGPT conversations to organize them with chakra colors
+                  </p>
+                  <Button 
+                    onClick={() => setIsImportDialogOpen(true)}
+                    disabled={!selectedProject}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import Your First Chat
+                  </Button>
+                </Card>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+      
+      {selectedProject && (
+        <ImportChatsDialog
+          open={isImportDialogOpen}
+          onOpenChange={(open) => {
+            setIsImportDialogOpen(open);
+            if (!open && selectedProject) {
+              fetchChats(selectedProject);
+            }
+          }}
+          projectId={selectedProject}
+        />
       )}
     </div>
   );

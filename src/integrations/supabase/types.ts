@@ -16,30 +16,45 @@ export type Database = {
     Tables: {
       ai_chats: {
         Row: {
+          chakra_category: string | null
           chat_date: string | null
           content: string
           created_at: string | null
           id: string
+          priority: string | null
           project_id: string
           source: string | null
+          starred: boolean | null
+          status: string | null
+          tags: string[] | null
           title: string
         }
         Insert: {
+          chakra_category?: string | null
           chat_date?: string | null
           content: string
           created_at?: string | null
           id?: string
+          priority?: string | null
           project_id: string
           source?: string | null
+          starred?: boolean | null
+          status?: string | null
+          tags?: string[] | null
           title: string
         }
         Update: {
+          chakra_category?: string | null
           chat_date?: string | null
           content?: string
           created_at?: string | null
           id?: string
+          priority?: string | null
           project_id?: string
           source?: string | null
+          starred?: boolean | null
+          status?: string | null
+          tags?: string[] | null
           title?: string
         }
         Relationships: [

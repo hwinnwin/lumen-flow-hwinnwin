@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/hooks/use-toast";
 
 const mockInsights = [
   {
@@ -66,9 +67,24 @@ export default function Insights() {
   });
 
   const toggleFavorite = (id: number) => {
-    setInsights(insights.map(insight => 
-      insight.id === id ? { ...insight, isFavorite: !insight.isFavorite } : insight
+    const insight = insights.find(i => i.id === id);
+    setInsights(insights.map(i => 
+      i.id === id ? { ...i, isFavorite: !i.isFavorite } : i
     ));
+    toast({
+      title: insight?.isFavorite ? "Removed from favorites" : "Added to favorites",
+      description: insight?.title,
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    const insight = insights.find(i => i.id === id);
+    setInsights(insights.filter(i => i.id !== id));
+    toast({
+      title: "Insight deleted",
+      description: insight?.title,
+      variant: "destructive",
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -92,7 +108,13 @@ export default function Insights() {
             Your personal knowledge journal and insight collection
           </p>
         </div>
-        <Button className="bg-gradient-primary text-primary-foreground shadow-royal">
+        <Button 
+          className="bg-gradient-primary text-primary-foreground shadow-royal"
+          onClick={() => toast({
+            title: "New Insight",
+            description: "Insight creation coming soon with backend integration.",
+          })}
+        >
           <Plus className="w-4 h-4 mr-2" />
           New Insight
         </Button>
@@ -242,6 +264,7 @@ export default function Insights() {
                     variant="ghost"
                     size="sm"
                     className="p-2 text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(insight.id)}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -274,7 +297,17 @@ export default function Insights() {
               
               {editingId === insight.id && (
                 <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-                  <Button size="sm" className="bg-gradient-primary text-primary-foreground">
+                  <Button 
+                    size="sm" 
+                    className="bg-gradient-primary text-primary-foreground"
+                    onClick={() => {
+                      setEditingId(null);
+                      toast({
+                        title: "Changes saved",
+                        description: "Your insight has been updated.",
+                      });
+                    }}
+                  >
                     Save Changes
                   </Button>
                   <Button 

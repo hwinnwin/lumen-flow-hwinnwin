@@ -2,6 +2,8 @@ import { Calendar, Clock, Target, Lightbulb, BookOpen, TrendingUp } from "lucide
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 const mockTasks = [
   { id: 1, title: "Review Q4 Strategy Document", due: "Today", priority: "high" },
@@ -22,6 +24,8 @@ const mockInsights = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -125,7 +129,11 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-            <Button className="w-full mt-4 bg-gradient-primary text-primary-foreground" size="sm">
+            <Button 
+              className="w-full mt-4 bg-gradient-primary text-primary-foreground" 
+              size="sm"
+              onClick={() => navigate('/workflow')}
+            >
               View All Tasks
             </Button>
           </CardContent>
@@ -153,7 +161,12 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <Button variant="outline" className="w-full mt-4" size="sm">
+            <Button 
+              variant="outline" 
+              className="w-full mt-4" 
+              size="sm"
+              onClick={() => navigate('/codex')}
+            >
               Explore Codex
             </Button>
           </CardContent>
@@ -177,7 +190,12 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-            <Button variant="outline" className="w-full mt-4" size="sm">
+            <Button 
+              variant="outline" 
+              className="w-full mt-4" 
+              size="sm"
+              onClick={() => navigate('/insights')}
+            >
               View All Insights
             </Button>
           </CardContent>

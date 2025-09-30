@@ -4,6 +4,7 @@ import { Workflow as WorkflowIcon, Plus, Calendar, User, Flag } from "lucide-rea
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
 const initialTasks = {
   todo: [
@@ -135,7 +136,13 @@ export default function Workflow() {
             Manage your tasks with a powerful Kanban board
           </p>
         </div>
-        <Button className="bg-gradient-primary text-primary-foreground shadow-royal">
+        <Button 
+          className="bg-gradient-primary text-primary-foreground shadow-royal"
+          onClick={() => toast({
+            title: "Add Task",
+            description: "Task creation coming soon with backend integration.",
+          })}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Task
         </Button>

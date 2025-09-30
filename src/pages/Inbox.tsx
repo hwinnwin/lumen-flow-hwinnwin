@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
 const mockItems = [
   {
@@ -62,10 +63,19 @@ export default function Inbox() {
 
   const handleApprove = (id: number) => {
     setItems(items.filter(item => item.id !== id));
+    toast({
+      title: "Item approved",
+      description: "The item has been added to your collection.",
+    });
   };
 
   const handleReject = (id: number) => {
     setItems(items.filter(item => item.id !== id));
+    toast({
+      title: "Item rejected",
+      description: "The item has been removed.",
+      variant: "destructive",
+    });
   };
 
   return (
@@ -80,7 +90,13 @@ export default function Inbox() {
             Review and approve AI-parsed items from your sources
           </p>
         </div>
-        <Button className="bg-gradient-primary text-primary-foreground shadow-royal">
+        <Button 
+          className="bg-gradient-primary text-primary-foreground shadow-royal"
+          onClick={() => toast({
+            title: "Add Source",
+            description: "Source management coming soon with backend integration.",
+          })}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Source
         </Button>

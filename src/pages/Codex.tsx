@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
 const mockFrameworks = [
   {
@@ -90,9 +91,14 @@ export default function Codex() {
   });
 
   const toggleFavorite = (id: number) => {
+    const framework = frameworks.find(f => f.id === id);
     setFrameworks(frameworks.map(f => 
       f.id === id ? { ...f, isFavorite: !f.isFavorite } : f
     ));
+    toast({
+      title: framework?.isFavorite ? "Removed from favorites" : "Added to favorites",
+      description: framework?.title,
+    });
   };
 
   return (
@@ -107,7 +113,13 @@ export default function Codex() {
             Your collection of frameworks, methodologies, and philosophies
           </p>
         </div>
-        <Button className="bg-gradient-primary text-primary-foreground shadow-royal">
+        <Button 
+          className="bg-gradient-primary text-primary-foreground shadow-royal"
+          onClick={() => toast({
+            title: "Add Framework",
+            description: "Framework creation coming soon with backend integration.",
+          })}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Framework
         </Button>
@@ -253,11 +265,30 @@ export default function Codex() {
               </div>
               
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => {
+                    navigator.clipboard.writeText(framework.content);
+                    toast({
+                      title: "Copied to clipboard",
+                      description: framework.title,
+                    });
+                  }}
+                >
                   <Copy className="w-4 h-4 mr-2" />
                   Copy
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => toast({
+                    title: "Share",
+                    description: "Sharing functionality coming soon.",
+                  })}
+                >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Share
                 </Button>

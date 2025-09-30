@@ -58,8 +58,8 @@ export function AppSidebar() {
     >
       <SidebarContent className="p-0">
         {/* Header */}
-        <div className="p-6 border-b border-sidebar-border transition-all duration-300">
-          <div className="flex items-center gap-3">
+        <div className="p-6 pb-4 border-b border-sidebar-border transition-all duration-300">
+          <div className="flex items-center gap-3 mb-2">
             <div className="relative flex-shrink-0">
               <img 
                 src={lumenLogo} 
@@ -73,10 +73,14 @@ export function AppSidebar() {
                 <h1 className="text-xl font-bold bg-gradient-royal bg-clip-text text-transparent whitespace-nowrap">
                   Lumen Flow
                 </h1>
-                <p className="text-sm text-muted-foreground whitespace-nowrap">knowledge & workflow organiser</p>
               </div>
             )}
           </div>
+          {state !== "collapsed" && (
+            <p className="text-sm text-muted-foreground animate-fade-in">
+              Knowledge & Workflow Organiser
+            </p>
+          )}
         </div>
 
         {/* Quick Action */}

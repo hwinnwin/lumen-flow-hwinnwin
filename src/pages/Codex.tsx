@@ -209,9 +209,9 @@ export default function Codex() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent">
             Codex
@@ -223,14 +223,16 @@ export default function Codex() {
       </div>
       
       <Tabs defaultValue="frameworks" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="frameworks">
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsTrigger value="frameworks" className="text-sm">
             <BookOpen className="w-4 h-4 mr-2" />
-            Frameworks
+            <span className="hidden sm:inline">Frameworks</span>
+            <span className="sm:hidden">Frames</span>
           </TabsTrigger>
-          <TabsTrigger value="chats">
+          <TabsTrigger value="chats" className="text-sm">
             <MessageSquare className="w-4 h-4 mr-2" />
-            AI Chats
+            <span className="hidden sm:inline">AI Chats</span>
+            <span className="sm:hidden">Chats</span>
           </TabsTrigger>
         </TabsList>
         
@@ -252,8 +254,8 @@ export default function Codex() {
           </div>
 
           {/* Search and Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="flex flex-col lg:flex-row gap-4 w-full">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search frameworks, tags, or content..."
@@ -263,7 +265,7 @@ export default function Codex() {
               />
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {categories.map((category) => (
                 <Button
                   key={category}

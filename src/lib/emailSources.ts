@@ -30,7 +30,7 @@ export async function addEmailSource(
     throw new Error('User not authenticated');
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('email_sources')
     .insert({
       user_id: user.id,
@@ -55,7 +55,7 @@ export async function getActiveEmailSources(): Promise<EmailSource[]> {
     throw new Error('User not authenticated');
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('email_sources')
     .select('*')
     .eq('user_id', user.id)
@@ -72,7 +72,7 @@ export async function refreshEmailSourceToken(
   newRefreshToken: string,
   newExpiresAt: string
 ): Promise<EmailSource> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('email_sources')
     .update({
       access_token: newAccessToken,
@@ -88,7 +88,7 @@ export async function refreshEmailSourceToken(
 }
 
 export async function updateLastSync(sourceId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('email_sources')
     .update({ last_sync_at: new Date().toISOString() })
     .eq('id', sourceId);
@@ -97,7 +97,7 @@ export async function updateLastSync(sourceId: string): Promise<void> {
 }
 
 export async function deactivateEmailSource(sourceId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('email_sources')
     .update({ is_active: false })
     .eq('id', sourceId);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Upload, FileJson } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +28,13 @@ export function ImportChatsDialog({ open, onOpenChange, projectId, onImportCompl
               Loading project...
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     );

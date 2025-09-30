@@ -63,15 +63,15 @@ export function AppSidebar() {
             <div className="relative">
               <img 
                 src={lumenLogo} 
-                alt="Lumen Empire" 
-                className="w-10 h-10 rounded-lg shadow-glow" 
+                alt="Lumen Flow" 
+                className="w-10 h-10 rounded-lg shadow-glow"
               />
               <div className="absolute inset-0 bg-gradient-glow opacity-30 rounded-lg" />
             </div>
             {state !== "collapsed" && (
               <div>
                 <h1 className="text-xl font-bold bg-gradient-royal bg-clip-text text-transparent">
-                  Lumen Empire
+                  Lumen Flow
                 </h1>
                 <p className="text-sm text-muted-foreground">Knowledge & Workflow</p>
               </div>

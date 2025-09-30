@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { chakraCategories, type ChakraCategory } from "@/lib/chakraSystem";
 
 const initialTasks = {
   todo: [
@@ -15,7 +16,8 @@ const initialTasks = {
       priority: "high",
       assignee: "You",
       dueDate: "2024-01-15",
-      tags: ["strategy", "review"]
+      tags: ["strategy", "review"],
+      chakra_category: "crown" as ChakraCategory // Strategic thinking, higher consciousness
     },
     {
       id: "task-2",
@@ -24,7 +26,8 @@ const initialTasks = {
       priority: "medium",
       assignee: "Design Team",
       dueDate: "2024-01-20",
-      tags: ["ux", "onboarding"]
+      tags: ["ux", "onboarding"],
+      chakra_category: "heart" as ChakraCategory // Empathy, connection with users
     },
     {
       id: "task-3",
@@ -33,7 +36,8 @@ const initialTasks = {
       priority: "low",
       assignee: "Dev Team",
       dueDate: "2024-01-25",
-      tags: ["development", "analytics"]
+      tags: ["development", "analytics"],
+      chakra_category: "third_eye" as ChakraCategory // Vision, data analysis
     }
   ],
   doing: [
@@ -44,7 +48,8 @@ const initialTasks = {
       priority: "high",
       assignee: "You",
       dueDate: "2024-01-12",
-      tags: ["presentation", "client"]
+      tags: ["presentation", "client"],
+      chakra_category: "throat" as ChakraCategory // Communication, expression
     },
     {
       id: "task-5",
@@ -53,7 +58,8 @@ const initialTasks = {
       priority: "medium",
       assignee: "HR Team",
       dueDate: "2024-01-18",
-      tags: ["hr", "reviews"]
+      tags: ["hr", "reviews"],
+      chakra_category: "heart" as ChakraCategory // Compassion, human connection
     }
   ],
   done: [
@@ -64,7 +70,8 @@ const initialTasks = {
       priority: "high",
       assignee: "Marketing Team",
       dueDate: "2024-01-10",
-      tags: ["marketing", "campaign"]
+      tags: ["marketing", "campaign"],
+      chakra_category: "sacral" as ChakraCategory // Creativity, emotional connection
     },
     {
       id: "task-7",
@@ -73,7 +80,8 @@ const initialTasks = {
       priority: "high",
       assignee: "Security Team",
       dueDate: "2024-01-08",
-      tags: ["security", "audit"]
+      tags: ["security", "audit"],
+      chakra_category: "root" as ChakraCategory // Safety, foundation, security
     }
   ]
 };
@@ -242,14 +250,41 @@ export default function Workflow() {
                               }`}
                             >
                               <div className="space-y-3">
-                                <div className="flex items-start justify-between">
-                                  <h4 className="font-semibold text-foreground">{task.title}</h4>
-                                  <Badge 
-                                    className={priorityColors[task.priority as keyof typeof priorityColors]}
-                                  >
-                                    <Flag className="w-3 h-3 mr-1" />
-                                    {task.priority}
-                                  </Badge>
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className="font-semibold text-foreground flex-1">{task.title}</h4>
+                                  <div className="flex items-center gap-2">
+                                    {/* Chakra Energy Indicator */}
+                                    <div 
+                                      className="relative flex items-center gap-1.5 px-2 py-1 rounded-md border"
+                                      style={{
+                                        borderColor: `hsl(${chakraCategories[task.chakra_category].color})`,
+                                        backgroundColor: `hsl(${chakraCategories[task.chakra_category].color} / 0.1)`
+                                      }}
+                                      title={`${chakraCategories[task.chakra_category].label} Energy: ${chakraCategories[task.chakra_category].description}`}
+                                    >
+                                      <div 
+                                        className="w-2 h-2 rounded-full animate-pulse"
+                                        style={{
+                                          backgroundColor: `hsl(${chakraCategories[task.chakra_category].color})`
+                                        }}
+                                      />
+                                      <span 
+                                        className="text-xs font-medium"
+                                        style={{
+                                          color: `hsl(${chakraCategories[task.chakra_category].color})`
+                                        }}
+                                      >
+                                        {chakraCategories[task.chakra_category].label}
+                                      </span>
+                                    </div>
+                                    {/* Priority Badge */}
+                                    <Badge 
+                                      className={priorityColors[task.priority as keyof typeof priorityColors]}
+                                    >
+                                      <Flag className="w-3 h-3 mr-1" />
+                                      {task.priority}
+                                    </Badge>
+                                  </div>
                                 </div>
                                 
                                 <p className="text-sm text-muted-foreground line-clamp-2">

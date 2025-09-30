@@ -9,13 +9,28 @@ import { chakraCategories, type ChakraCategory } from "@/lib/chakraSystem";
 interface ImportChatsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  projectId: string | null;
   onImportComplete?: () => void;
 }
 
 export function ImportChatsDialog({ open, onOpenChange, projectId, onImportComplete }: ImportChatsDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  if (!projectId) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Conversations</DialogTitle>
+            <DialogDescription>
+              Loading project...
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const categorizeChat = (title: string, content: string): ChakraCategory => {
     const text = `${title} ${content}`.toLowerCase();

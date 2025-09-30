@@ -538,19 +538,17 @@ export default function Codex() {
         </TabsContent>
       </Tabs>
       
-      {selectedProject && (
-        <ImportChatsDialog
-          open={isImportDialogOpen}
-          onOpenChange={(open) => {
-            setIsImportDialogOpen(open);
-            if (!open && selectedProject) {
-              fetchChats(selectedProject);
-            }
-          }}
-          projectId={selectedProject}
-          onImportComplete={() => selectedProject && fetchChats(selectedProject)}
-        />
-      )}
+      <ImportChatsDialog
+        open={isImportDialogOpen}
+        onOpenChange={(open) => {
+          setIsImportDialogOpen(open);
+          if (!open && selectedProject) {
+            fetchChats(selectedProject);
+          }
+        }}
+        projectId={selectedProject || null}
+        onImportComplete={() => selectedProject && fetchChats(selectedProject)}
+      />
     </div>
   );
 }

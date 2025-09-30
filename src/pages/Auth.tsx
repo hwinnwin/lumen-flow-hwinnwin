@@ -89,7 +89,7 @@ export default function Auth() {
           <div className="flex items-center justify-center mb-4">
             <Lightbulb className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold">Project Focus Manager</CardTitle>
+          <CardTitle className="text-3xl font-bold">Lumen Flow</CardTitle>
           <CardDescription>
             Manage multiple projects without losing focus
           </CardDescription>

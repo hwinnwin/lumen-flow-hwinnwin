@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Inbox as InboxIcon, Clock, Tag, CheckCircle, Edit, Trash2, Plus } from "lucide-react";
+import { Inbox as InboxIcon, Clock, Tag, CheckCircle, Edit, Trash2, Plus, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 
 const mockItems = [
@@ -80,6 +81,16 @@ export default function Inbox() {
 
   return (
     <div className="space-y-6">
+      {/* Demo Notice */}
+      <Alert className="bg-blue-500/10 border-blue-500/20">
+        <Info className="h-4 w-4 text-blue-500" />
+        <AlertDescription className="text-foreground">
+          <strong>Demo Mode:</strong> These are sample items to demonstrate the AI inbox workflow. 
+          In production, items will be automatically parsed from your connected email sources (Gmail/Outlook) 
+          and categorized as Tasks, Frameworks, Insights, or Scripts for your review.
+        </AlertDescription>
+      </Alert>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -179,6 +190,9 @@ export default function Inbox() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
+                    <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">
+                      SAMPLE
+                    </Badge>
                     <Badge className={typeColors[item.type as keyof typeof typeColors]}>
                       {item.type}
                     </Badge>

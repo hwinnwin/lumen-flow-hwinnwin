@@ -127,7 +127,7 @@ export default function Projects() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Lightbulb className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">Project Focus Manager</h1>
+            <h1 className="text-2xl font-bold">Lumen Flow</h1>
           </div>
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
             <LogOut className="h-4 w-4 mr-2" />

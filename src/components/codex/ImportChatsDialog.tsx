@@ -10,9 +10,10 @@ interface ImportChatsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
+  onImportComplete?: () => void;
 }
 
-export function ImportChatsDialog({ open, onOpenChange, projectId }: ImportChatsDialogProps) {
+export function ImportChatsDialog({ open, onOpenChange, projectId, onImportComplete }: ImportChatsDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
@@ -96,6 +97,7 @@ export function ImportChatsDialog({ open, onOpenChange, projectId }: ImportChats
         description: `Successfully imported ${imported} chat${imported !== 1 ? 's' : ''}${failed > 0 ? `, ${failed} failed` : ''}`,
       });
 
+      onImportComplete?.();
       onOpenChange(false);
     } catch (error) {
       console.error('Import error:', error);

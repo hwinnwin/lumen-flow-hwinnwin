@@ -527,7 +527,6 @@ export default function Codex() {
                   </p>
                   <Button 
                     onClick={() => setIsImportDialogOpen(true)}
-                    disabled={!selectedProject}
                   >
                     <Upload className="w-4 h-4 mr-2" />
                     Import Your First Chat
@@ -549,6 +548,7 @@ export default function Codex() {
             }
           }}
           projectId={selectedProject}
+          onImportComplete={() => selectedProject && fetchChats(selectedProject)}
         />
       )}
     </div>

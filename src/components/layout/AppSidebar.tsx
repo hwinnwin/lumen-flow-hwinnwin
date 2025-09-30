@@ -73,7 +73,7 @@ export function AppSidebar() {
                 <h1 className="text-xl font-bold bg-gradient-royal bg-clip-text text-transparent whitespace-nowrap">
                   Lumen Flow
                 </h1>
-                <p className="text-sm text-muted-foreground whitespace-nowrap">Knowledge & Workflow</p>
+                <p className="text-sm text-muted-foreground whitespace-nowrap">knowledge & workflow organiser</p>
               </div>
             )}
           </div>

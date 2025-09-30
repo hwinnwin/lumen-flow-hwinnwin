@@ -113,9 +113,9 @@ export function ImportChatsDialog({ open, onOpenChange, projectId }: ImportChats
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import ChatGPT Conversations</DialogTitle>
+          <DialogTitle>Import Conversations</DialogTitle>
           <DialogDescription>
-            Upload your ChatGPT conversation export (JSON format). Chats will be automatically categorized using chakra colors.
+            Upload your chat conversation export (JSON format). Chats will be automatically categorized using chakra colors.
           </DialogDescription>
         </DialogHeader>
 
@@ -123,7 +123,7 @@ export function ImportChatsDialog({ open, onOpenChange, projectId }: ImportChats
           <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
             <FileJson className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground mb-4">
-              Select your ChatGPT export file (conversations.json)
+              Select your chat export file (JSON format)
             </p>
             <label htmlFor="file-upload">
               <Button disabled={isProcessing} asChild>

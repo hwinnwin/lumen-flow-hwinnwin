@@ -464,7 +464,7 @@ export default function Codex() {
               onClick={() => setIsImportDialogOpen(true)}
             >
               <Upload className="w-4 h-4 mr-2" />
-              Import ChatGPT
+              Import Chats
             </Button>
           </div>
           

@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { chakraCategories, type ChakraCategory } from "@/lib/chakraSystem";
 
 const mockTasks = [
-  { id: 1, title: "Review Q4 Strategy Document", due: "Today", priority: "high" },
-  { id: 2, title: "Prepare Client Presentation", due: "Tomorrow", priority: "medium" },
-  { id: 3, title: "Update Team Dashboard", due: "This Week", priority: "low" },
+  { id: 1, title: "Review Q4 Strategy Document", due: "Today", priority: "high", chakra_category: "crown" as ChakraCategory },
+  { id: 2, title: "Prepare Client Presentation", due: "Tomorrow", priority: "medium", chakra_category: "throat" as ChakraCategory },
+  { id: 3, title: "Update Team Dashboard", due: "This Week", priority: "low", chakra_category: "solar_plexus" as ChakraCategory },
 ];
 
 const mockFramework = {
@@ -112,24 +113,47 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-3">
               {mockTasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted hover:bg-muted/80 transition-smooth">
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground">{task.title}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Clock className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{task.due}</span>
-                      <Badge 
-                        className={
-                          task.priority === 'high' 
-                            ? 'bg-red-500/10 text-red-500 border-red-500/20 text-xs' 
-                            : task.priority === 'medium' 
-                            ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs' 
-                            : 'bg-green-500/10 text-green-500 border-green-500/20 text-xs'
-                        }
-                      >
-                        {task.priority}
-                      </Badge>
+                <div key={task.id} className="p-3 rounded-lg bg-muted hover:bg-muted/80 transition-smooth">
+                  <p className="font-medium text-foreground mb-2">{task.title}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span>{task.due}</span>
                     </div>
+                    <div 
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border"
+                      style={{
+                        borderColor: chakraCategories[task.chakra_category].color,
+                        backgroundColor: `${chakraCategories[task.chakra_category].color.replace(')', ' / 0.1)')}`
+                      }}
+                      title={`${chakraCategories[task.chakra_category].label} Energy: ${chakraCategories[task.chakra_category].description}`}
+                    >
+                      <div 
+                        className="w-2 h-2 rounded-full animate-pulse"
+                        style={{
+                          backgroundColor: chakraCategories[task.chakra_category].color
+                        }}
+                      />
+                      <span 
+                        className="text-xs font-medium"
+                        style={{
+                          color: chakraCategories[task.chakra_category].color
+                        }}
+                      >
+                        {chakraCategories[task.chakra_category].label}
+                      </span>
+                    </div>
+                    <Badge 
+                      className={
+                        task.priority === 'high' 
+                          ? 'bg-red-500/10 text-red-500 border-red-500/20 text-xs' 
+                          : task.priority === 'medium' 
+                          ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs' 
+                          : 'bg-green-500/10 text-green-500 border-green-500/20 text-xs'
+                      }
+                    >
+                      {task.priority}
+                    </Badge>
                   </div>
                 </div>
               ))}

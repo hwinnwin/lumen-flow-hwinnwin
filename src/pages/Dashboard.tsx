@@ -119,8 +119,13 @@ export default function Dashboard() {
                       <Clock className="w-3 h-3 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">{task.due}</span>
                       <Badge 
-                        variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'default' : 'secondary'}
-                        className="text-xs"
+                        className={
+                          task.priority === 'high' 
+                            ? 'bg-red-500/10 text-red-500 border-red-500/20 text-xs' 
+                            : task.priority === 'medium' 
+                            ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs' 
+                            : 'bg-green-500/10 text-green-500 border-green-500/20 text-xs'
+                        }
                       >
                         {task.priority}
                       </Badge>

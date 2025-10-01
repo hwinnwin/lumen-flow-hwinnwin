@@ -1,1 +1,13 @@
 project_id = "aezqxhlogcvvfckhiyfl"
+
+[functions.connect-email]
+verify_jwt = false
+
+[functions.email-oauth-callback]
+verify_jwt = false
+
+[functions.sync-emails]
+verify_jwt = true
+
+[functions.parse-emails]
+verify_jwt = true

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Inbox as InboxIcon, Clock, Tag, CheckCircle, Edit, Trash2, Plus, Info } from "lucide-react";
+import { Inbox as InboxIcon, Clock, Tag, CheckCircle, Edit, Trash2, Plus, Info, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import { APP_CONFIG } from "@/config/appConfig";
 import { supabase } from "@/integrations/supabase/client";
+import { AddSourceDialog } from "@/components/inbox/AddSourceDialog";
+import { chakraCategories } from "@/lib/chakraSystem";
 
 const mockItems = [
   {
@@ -19,7 +21,9 @@ const mockItems = [
     tags: ["marketing", "approval", "Q1"],
     confidence: 0.95,
     parsed_at: "2 mins ago",
-    status: "pending"
+    status: "pending",
+    chakra_category: "solar_plexus" as const,
+    priority: "high"
   },
   {
     id: 2,
@@ -29,7 +33,9 @@ const mockItems = [
     tags: ["agile", "scrum", "management"],
     confidence: 0.87,
     parsed_at: "1 hour ago",
-    status: "pending"
+    status: "pending",
+    chakra_category: "crown" as const,
+    priority: "medium"
   },
   {
     id: 3,
@@ -39,7 +45,9 @@ const mockItems = [
     tags: ["analytics", "retention", "onboarding"],
     confidence: 0.92,
     parsed_at: "3 hours ago",
-    status: "pending"
+    status: "pending",
+    chakra_category: "third_eye" as const,
+    priority: "medium"
   },
   {
     id: 4,
@@ -49,7 +57,9 @@ const mockItems = [
     tags: ["automation", "reporting", "weekly"],
     confidence: 0.89,
     parsed_at: "1 day ago",
-    status: "pending"
+    status: "pending",
+    chakra_category: "sacral" as const,
+    priority: "low"
   }
 ];
 
@@ -64,6 +74,8 @@ export default function Inbox() {
   const [items, setItems] = useState(APP_CONFIG.demoMode ? mockItems : []);
   const [selectedItem, setSelectedItem] = useState<number | null>(null);
   const [loading, setLoading] = useState(!APP_CONFIG.demoMode);
+  const [syncing, setSyncing] = useState(false);
+  const [showAddSource, setShowAddSource] = useState(false);
 
   useEffect(() => {
     if (!APP_CONFIG.demoMode) {
@@ -74,17 +86,48 @@ export default function Inbox() {
   const fetchInboxItems = async () => {
     try {
       setLoading(true);
-      // TODO: Fetch from inbox_items table when it's created in Supabase
-      // For now, return empty array in production mode
-      // const { data, error } = await supabase
-      //   .from('inbox_items')
-      //   .select('*')
-      //   .eq('status', 'pending')
-      //   .order('created_at', { ascending: false });
-      // if (error) throw error;
-      // if (data) setItems(data);
       
-      setItems([]);
+      // Fetch emails and their parsed AI content
+      const { data: emails, error } = await supabase
+        .from('emails')
+        .select(`
+          *,
+          ai_chats (
+            id,
+            title,
+            content,
+            chakra_category,
+            tags,
+            priority,
+            status
+          )
+        `)
+        .order('received_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // Transform to inbox items format
+      const inboxItems = emails?.map((email: any) => {
+        const aiChat = email.ai_chats?.[0];
+        
+        return {
+          id: email.id,
+          type: aiChat ? determineType(aiChat.tags) : "email",
+          title: aiChat?.title || email.subject || '(No Subject)',
+          content: aiChat?.content || email.snippet || '',
+          tags: aiChat?.tags || [],
+          confidence: aiChat ? 0.85 : 0,
+          parsed_at: email.created_at,
+          status: aiChat?.status || 'unparsed',
+          chakra_category: aiChat?.chakra_category,
+          priority: aiChat?.priority,
+          sender: email.sender,
+          received_at: email.received_at,
+        };
+      }) || [];
+
+      setItems(inboxItems);
     } catch (error) {
       console.error('Error fetching inbox items:', error);
       toast({
@@ -95,6 +138,40 @@ export default function Inbox() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSyncEmails = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-emails');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Sync Complete",
+        description: `Synced ${data.synced} new emails`,
+      });
+      
+      // Refresh the inbox
+      await fetchInboxItems();
+    } catch (error) {
+      console.error('Error syncing emails:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Unable to sync emails. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const determineType = (tags: string[]) => {
+    if (tags.includes('task')) return 'task';
+    if (tags.includes('framework')) return 'framework';
+    if (tags.includes('insight')) return 'insight';
+    if (tags.includes('script')) return 'script';
+    return 'email';
   };
 
   const handleApprove = (id: number) => {
@@ -138,17 +215,28 @@ export default function Inbox() {
             Review and approve AI-parsed items from your sources
           </p>
         </div>
-        <Button 
-          className="bg-gradient-primary text-primary-foreground shadow-royal"
-          onClick={() => toast({
-            title: "Add Source",
-            description: "Source management coming soon with backend integration.",
-          })}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Source
-        </Button>
+        <div className="flex gap-2">
+          {!APP_CONFIG.demoMode && (
+            <Button 
+              variant="outline"
+              onClick={handleSyncEmails}
+              disabled={syncing}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Now'}
+            </Button>
+          )}
+          <Button 
+            className="bg-gradient-primary text-primary-foreground shadow-royal"
+            onClick={() => setShowAddSource(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Source
+          </Button>
+        </div>
       </div>
+      
+      <AddSourceDialog open={showAddSource} onOpenChange={setShowAddSource} />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -226,20 +314,46 @@ export default function Inbox() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">
-                      SAMPLE
-                    </Badge>
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    {APP_CONFIG.demoMode && (
+                      <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">
+                        SAMPLE
+                      </Badge>
+                    )}
+                    {item.status === 'unparsed' && (
+                      <Badge variant="outline" className="border-orange-500/50 text-orange-500 bg-orange-500/10">
+                        Unparsed Email
+                      </Badge>
+                    )}
                     <Badge className={typeColors[item.type as keyof typeof typeColors]}>
                       {item.type}
                     </Badge>
+                    {item.chakra_category && (
+                      <div 
+                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs"
+                        style={{
+                          borderColor: chakraCategories[item.chakra_category].color,
+                          backgroundColor: `${chakraCategories[item.chakra_category].color.replace(')', ' / 0.1)')}`
+                        }}
+                      >
+                        <div 
+                          className="w-2 h-2 rounded-full animate-pulse"
+                          style={{ backgroundColor: chakraCategories[item.chakra_category].color }}
+                        />
+                        <span style={{ color: chakraCategories[item.chakra_category].color }}>
+                          {chakraCategories[item.chakra_category].label}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="w-3 h-3" />
-                      {item.parsed_at}
+                      {item.parsed_at ? new Date(item.parsed_at).toLocaleString() : 'Just now'}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Confidence: {Math.round(item.confidence * 100)}%
-                    </div>
+                    {item.confidence > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Confidence: {Math.round(item.confidence * 100)}%
+                      </div>
+                    )}
                   </div>
 
                   <h3 className="text-lg font-semibold text-foreground mb-2">

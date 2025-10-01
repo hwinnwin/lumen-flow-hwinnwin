@@ -26,8 +26,61 @@ export function AddSourceDialog({ open, onOpenChange }: AddSourceDialogProps) {
       if (error) throw error;
 
       if (data.authUrl) {
-        // Redirect to OAuth provider
-        window.location.href = data.authUrl;
+        // Open OAuth in popup window
+        const width = 500;
+        const height = 600;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+        
+        const popup = window.open(
+          data.authUrl,
+          'oauth',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+
+        // Listen for OAuth callback
+        const handleMessage = async (event: MessageEvent) => {
+          if (event.data.type === 'oauth-success') {
+            const { provider, emailAddress, accessToken, refreshToken, expiresAt } = event.data;
+            
+            // Store the email source in database
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+              const { error: insertError } = await supabase
+                .from('email_sources')
+                .insert({
+                  user_id: user.id,
+                  provider,
+                  email_address: emailAddress,
+                  access_token: accessToken,
+                  refresh_token: refreshToken,
+                  token_expires_at: expiresAt,
+                  is_active: true,
+                });
+
+              if (insertError) {
+                console.error('Error saving email source:', insertError);
+                toast({
+                  title: "Error",
+                  description: "Failed to save email connection.",
+                  variant: "destructive"
+                });
+              } else {
+                toast({
+                  title: "Connected!",
+                  description: `Successfully connected ${emailAddress}`,
+                });
+                onOpenChange(false);
+              }
+            }
+            
+            window.removeEventListener('message', handleMessage);
+            if (popup) popup.close();
+          }
+        };
+
+        window.addEventListener('message', handleMessage);
       }
     } catch (error) {
       console.error('Error connecting email:', error);

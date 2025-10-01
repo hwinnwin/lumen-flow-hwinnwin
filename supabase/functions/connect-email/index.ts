@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +29,7 @@ serve(async (req) => {
       throw new Error(`${provider.toUpperCase()}_CLIENT_ID not configured`);
     }
 
-    // Generate OAuth URL
+    // Generate OAuth URL with state parameter
     let authUrl: string;
     
     if (provider === 'gmail') {
@@ -45,11 +44,13 @@ serve(async (req) => {
         `response_type=code&` +
         `scope=${encodeURIComponent(scopes)}&` +
         `access_type=offline&` +
-        `prompt=consent`;
+        `prompt=consent&` +
+        `state=${provider}`;
     } else {
       const scopes = [
         'https://graph.microsoft.com/Mail.Read',
-        'https://graph.microsoft.com/User.Read'
+        'https://graph.microsoft.com/User.Read',
+        'offline_access'
       ].join(' ');
       
       authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
@@ -57,7 +58,8 @@ serve(async (req) => {
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `response_type=code&` +
         `scope=${encodeURIComponent(scopes)}&` +
-        `response_mode=query`;
+        `response_mode=query&` +
+        `state=${provider}`;
     }
 
     return new Response(

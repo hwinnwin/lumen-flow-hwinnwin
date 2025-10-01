@@ -20,6 +20,7 @@ export type Database = {
           chat_date: string | null
           content: string
           created_at: string | null
+          email_id: string | null
           id: string
           priority: string | null
           project_id: string
@@ -34,6 +35,7 @@ export type Database = {
           chat_date?: string | null
           content: string
           created_at?: string | null
+          email_id?: string | null
           id?: string
           priority?: string | null
           project_id: string
@@ -48,6 +50,7 @@ export type Database = {
           chat_date?: string | null
           content?: string
           created_at?: string | null
+          email_id?: string | null
           id?: string
           priority?: string | null
           project_id?: string
@@ -58,6 +61,13 @@ export type Database = {
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_chats_email_id_fkey"
+            columns: ["email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_chats_project_id_fkey"
             columns: ["project_id"]
@@ -107,6 +117,104 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_sources: {
+        Row: {
+          access_token: string | null
+          created_at: string | null
+          email_address: string
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          metadata: Json | null
+          provider: string
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string | null
+          email_address: string
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          metadata?: Json | null
+          provider: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string | null
+          email_address?: string
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          metadata?: Json | null
+          provider?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      emails: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          external_id: string | null
+          id: string
+          metadata: Json | null
+          received_at: string
+          recipients: string[] | null
+          sender: string
+          snippet: string | null
+          source_id: string
+          subject: string | null
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          metadata?: Json | null
+          received_at: string
+          recipients?: string[] | null
+          sender: string
+          snippet?: string | null
+          source_id: string
+          subject?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          metadata?: Json | null
+          received_at?: string
+          recipients?: string[] | null
+          sender?: string
+          snippet?: string | null
+          source_id?: string
+          subject?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emails_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "email_sources"
             referencedColumns: ["id"]
           },
         ]

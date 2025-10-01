@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Inbox as InboxIcon, Clock, Tag, CheckCircle, Edit, Trash2, Plus, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
+import { APP_CONFIG } from "@/config/appConfig";
+import { supabase } from "@/integrations/supabase/client";
 
 const mockItems = [
   {
@@ -59,8 +61,41 @@ const typeColors = {
 };
 
 export default function Inbox() {
-  const [items, setItems] = useState(mockItems);
+  const [items, setItems] = useState(APP_CONFIG.demoMode ? mockItems : []);
   const [selectedItem, setSelectedItem] = useState<number | null>(null);
+  const [loading, setLoading] = useState(!APP_CONFIG.demoMode);
+
+  useEffect(() => {
+    if (!APP_CONFIG.demoMode) {
+      fetchInboxItems();
+    }
+  }, []);
+
+  const fetchInboxItems = async () => {
+    try {
+      setLoading(true);
+      // TODO: Fetch from inbox_items table when it's created in Supabase
+      // For now, return empty array in production mode
+      // const { data, error } = await supabase
+      //   .from('inbox_items')
+      //   .select('*')
+      //   .eq('status', 'pending')
+      //   .order('created_at', { ascending: false });
+      // if (error) throw error;
+      // if (data) setItems(data);
+      
+      setItems([]);
+    } catch (error) {
+      console.error('Error fetching inbox items:', error);
+      toast({
+        title: "Error loading items",
+        description: "Could not fetch inbox items from database.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleApprove = (id: number) => {
     setItems(items.filter(item => item.id !== id));
@@ -82,14 +117,16 @@ export default function Inbox() {
   return (
     <div className="space-y-6">
       {/* Demo Notice */}
-      <Alert className="bg-blue-500/10 border-blue-500/20">
-        <Info className="h-4 w-4 text-blue-500" />
-        <AlertDescription className="text-foreground">
-          <strong>Demo Mode:</strong> These are sample items to demonstrate the AI inbox workflow. 
-          In production, items will be automatically parsed from your connected email sources (Gmail/Outlook) 
-          and categorized as Tasks, Frameworks, Insights, or Scripts for your review.
-        </AlertDescription>
-      </Alert>
+      {APP_CONFIG.demoMode && (
+        <Alert className="bg-blue-500/10 border-blue-500/20">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-foreground">
+            <strong>Demo Mode:</strong> These are sample items to demonstrate the AI inbox workflow. 
+            In production, items will be automatically parsed from your connected email sources (Gmail/Outlook) 
+            and categorized as Tasks, Frameworks, Insights, or Scripts for your review.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -287,7 +324,13 @@ export default function Inbox() {
         ))}
       </div>
 
-      {items.length === 0 && (
+      {loading ? (
+        <Card className="bg-card border-border shadow-card">
+          <CardContent className="p-12 text-center">
+            <p className="text-muted-foreground">Loading inbox items...</p>
+          </CardContent>
+        </Card>
+      ) : items.length === 0 && (
         <Card className="bg-card border-border shadow-card">
           <CardContent className="p-12 text-center">
             <InboxIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />

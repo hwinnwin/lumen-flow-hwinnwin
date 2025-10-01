@@ -257,21 +257,21 @@ export default function Workflow() {
                                     <div 
                                       className="relative flex items-center gap-1.5 px-2 py-1 rounded-md border"
                                       style={{
-                                        borderColor: `hsl(${chakraCategories[task.chakra_category].color})`,
-                                        backgroundColor: `hsl(${chakraCategories[task.chakra_category].color} / 0.1)`
+                                        borderColor: chakraCategories[task.chakra_category].color,
+                                        backgroundColor: `${chakraCategories[task.chakra_category].color.replace(')', ' / 0.1)')}`
                                       }}
                                       title={`${chakraCategories[task.chakra_category].label} Energy: ${chakraCategories[task.chakra_category].description}`}
                                     >
                                       <div 
                                         className="w-2 h-2 rounded-full animate-pulse"
                                         style={{
-                                          backgroundColor: `hsl(${chakraCategories[task.chakra_category].color})`
+                                          backgroundColor: chakraCategories[task.chakra_category].color
                                         }}
                                       />
                                       <span 
                                         className="text-xs font-medium"
                                         style={{
-                                          color: `hsl(${chakraCategories[task.chakra_category].color})`
+                                          color: chakraCategories[task.chakra_category].color
                                         }}
                                       >
                                         {chakraCategories[task.chakra_category].label}

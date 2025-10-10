@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { Layout } from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Inbox from "./pages/Inbox";
@@ -11,6 +13,7 @@ import SOPs from "./pages/SOPs";
 import Principles from "./pages/Principles";
 import Codex from "./pages/Codex";
 import Insights from "./pages/Insights";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,16 +24,19 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout><Dashboard /></Layout>} />
-          <Route path="/inbox" element={<Layout><Inbox /></Layout>} />
-          <Route path="/workflow" element={<Layout><Workflow /></Layout>} />
-          <Route path="/sops" element={<Layout><SOPs /></Layout>} />
-          <Route path="/principles" element={<Layout><Principles /></Layout>} />
-          <Route path="/codex" element={<Layout><Codex /></Layout>} />
-          <Route path="/insights" element={<Layout><Insights /></Layout>} />
-          <Route path="*" element={<Layout><NotFound /></Layout>} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+            <Route path="/inbox" element={<ProtectedRoute><Layout><Inbox /></Layout></ProtectedRoute>} />
+            <Route path="/workflow" element={<ProtectedRoute><Layout><Workflow /></Layout></ProtectedRoute>} />
+            <Route path="/sops" element={<ProtectedRoute><Layout><SOPs /></Layout></ProtectedRoute>} />
+            <Route path="/principles" element={<ProtectedRoute><Layout><Principles /></Layout></ProtectedRoute>} />
+            <Route path="/codex" element={<ProtectedRoute><Layout><Codex /></Layout></ProtectedRoute>} />
+            <Route path="/insights" element={<ProtectedRoute><Layout><Insights /></Layout></ProtectedRoute>} />
+            <Route path="*" element={<ProtectedRoute><Layout><NotFound /></Layout></ProtectedRoute>} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

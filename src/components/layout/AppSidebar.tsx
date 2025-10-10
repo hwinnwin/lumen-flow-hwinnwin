@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Crown, 
   LayoutDashboard, 
@@ -9,9 +9,11 @@ import {
   Plus,
   Search,
   FileText,
-  Star
+  Star,
+  LogOut
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   Sidebar,
@@ -42,6 +44,26 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
+  const { user, signOut } = useAuth();
+  const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      // Fetch user profile
+      setTimeout(() => {
+        import("@/integrations/supabase/client").then(({ supabase }) => {
+          supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("user_id", user.id)
+            .single()
+            .then(({ data }) => {
+              if (data) setProfile(data);
+            });
+        });
+      }, 0);
+    }
+  }, [user]);
 
   const isActive = (path: string) => {
     if (path === "/") return currentPath === "/";
@@ -142,24 +164,40 @@ export function AppSidebar() {
 
         {/* User Section */}
         {state !== "collapsed" && (
-          <div className="mt-auto p-4 border-t border-sidebar-border animate-fade-in">
+          <div className="mt-auto p-4 border-t border-sidebar-border animate-fade-in space-y-2">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent">
               <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center">
                 <Crown className="w-4 h-4 text-primary-foreground" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">User</p>
-                <p className="text-xs text-muted-foreground">Free Plan</p>
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {profile?.full_name || user?.email?.split('@')[0] || "User"}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               </div>
             </div>
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-sm"
+              onClick={signOut}
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
           </div>
         )}
         
         {state === "collapsed" && (
           <div className="mt-auto p-3 border-t border-sidebar-border flex justify-center">
-            <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center hover-scale cursor-pointer" title="User Profile">
-              <Crown className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              title="Sign Out"
+              className="hover-scale"
+            >
+              <LogOut className="w-5 h-5" />
+            </Button>
           </div>
         )}
       </SidebarContent>

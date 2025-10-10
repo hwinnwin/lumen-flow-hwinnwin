@@ -7,7 +7,9 @@ import {
   BookOpen, 
   Lightbulb,
   Plus,
-  Search
+  Search,
+  FileText,
+  Star
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -30,6 +32,8 @@ const navigationItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Inbox", url: "/inbox", icon: Inbox },
   { title: "Workflow", url: "/workflow", icon: Workflow },
+  { title: "SOPs", url: "/sops", icon: FileText },
+  { title: "Principles", url: "/principles", icon: Star },
   { title: "Codex", url: "/codex", icon: BookOpen },
   { title: "Insights", url: "/insights", icon: Lightbulb },
 ];

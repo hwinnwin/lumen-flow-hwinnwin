@@ -7,6 +7,8 @@ import { Layout } from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Inbox from "./pages/Inbox";
 import Workflow from "./pages/Workflow";
+import SOPs from "./pages/SOPs";
+import Principles from "./pages/Principles";
 import Codex from "./pages/Codex";
 import Insights from "./pages/Insights";
 import NotFound from "./pages/NotFound";
@@ -23,6 +25,8 @@ const App = () => (
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
           <Route path="/inbox" element={<Layout><Inbox /></Layout>} />
           <Route path="/workflow" element={<Layout><Workflow /></Layout>} />
+          <Route path="/sops" element={<Layout><SOPs /></Layout>} />
+          <Route path="/principles" element={<Layout><Principles /></Layout>} />
           <Route path="/codex" element={<Layout><Codex /></Layout>} />
           <Route path="/insights" element={<Layout><Insights /></Layout>} />
           <Route path="*" element={<Layout><NotFound /></Layout>} />

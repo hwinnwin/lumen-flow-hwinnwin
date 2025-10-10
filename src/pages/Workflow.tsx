@@ -1,95 +1,19 @@
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { Workflow as WorkflowIcon, Plus, Calendar, User, Flag } from "lucide-react";
+import { Workflow as WorkflowIcon, Plus, Calendar, User, Flag, Trash2, Edit } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
-import { chakraCategories, type ChakraCategory } from "@/lib/chakraSystem";
-
-const initialTasks = {
-  todo: [
-    {
-      id: "task-1",
-      title: "Review Q4 Strategy Document",
-      description: "Comprehensive review of strategic planning document for next quarter",
-      priority: "high",
-      assignee: "You",
-      dueDate: "2024-01-15",
-      tags: ["strategy", "review"],
-      chakra_category: "crown" as ChakraCategory // Strategic thinking, higher consciousness
-    },
-    {
-      id: "task-2",
-      title: "Update Customer Onboarding Flow",
-      description: "Improve the customer onboarding experience based on recent feedback",
-      priority: "medium",
-      assignee: "Design Team",
-      dueDate: "2024-01-20",
-      tags: ["ux", "onboarding"],
-      chakra_category: "heart" as ChakraCategory // Empathy, connection with users
-    },
-    {
-      id: "task-3",
-      title: "Implement New Analytics Dashboard",
-      description: "Build comprehensive analytics dashboard for executive reporting",
-      priority: "low",
-      assignee: "Dev Team",
-      dueDate: "2024-01-25",
-      tags: ["development", "analytics"],
-      chakra_category: "third_eye" as ChakraCategory // Vision, data analysis
-    }
-  ],
-  doing: [
-    {
-      id: "task-4",
-      title: "Prepare Client Presentation",
-      description: "Create presentation for upcoming client meeting including ROI analysis",
-      priority: "high",
-      assignee: "You",
-      dueDate: "2024-01-12",
-      tags: ["presentation", "client"],
-      chakra_category: "throat" as ChakraCategory // Communication, expression
-    },
-    {
-      id: "task-5",
-      title: "Conduct Team Performance Reviews",
-      description: "Quarterly performance reviews for engineering team members",
-      priority: "medium",
-      assignee: "HR Team",
-      dueDate: "2024-01-18",
-      tags: ["hr", "reviews"],
-      chakra_category: "heart" as ChakraCategory // Compassion, human connection
-    }
-  ],
-  done: [
-    {
-      id: "task-6",
-      title: "Launch Marketing Campaign",
-      description: "Successfully launched Q1 marketing campaign across all channels",
-      priority: "high",
-      assignee: "Marketing Team",
-      dueDate: "2024-01-10",
-      tags: ["marketing", "campaign"],
-      chakra_category: "sacral" as ChakraCategory // Creativity, emotional connection
-    },
-    {
-      id: "task-7",
-      title: "Security Audit Completion",
-      description: "Completed comprehensive security audit of all systems",
-      priority: "high",
-      assignee: "Security Team",
-      dueDate: "2024-01-08",
-      tags: ["security", "audit"],
-      chakra_category: "root" as ChakraCategory // Safety, foundation, security
-    }
-  ]
-};
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, Task } from "@/hooks/useTask";
+import { TaskDialog } from "@/components/workflow/TaskDialog";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const columns = [
-  { id: "todo", title: "To Do", color: "border-blue-500" },
-  { id: "doing", title: "In Progress", color: "border-yellow-500" },
-  { id: "done", title: "Done", color: "border-green-500" }
+  { id: "pending", title: "To Do", color: "border-blue-500" },
+  { id: "in_progress", title: "In Progress", color: "border-yellow-500" },
+  { id: "completed", title: "Done", color: "border-green-500" }
 ];
 
 const priorityColors = {
@@ -99,38 +23,79 @@ const priorityColors = {
 };
 
 export default function Workflow() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  const { data: projects } = useQuery({
+    queryKey: ["projects"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: tasks = [], isLoading } = useTasks(selectedProject || undefined);
+  const createTask = useCreateTask();
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
+
+  const tasksByStatus = {
+    pending: tasks.filter(t => t.status === "pending"),
+    in_progress: tasks.filter(t => t.status === "in_progress"),
+    completed: tasks.filter(t => t.status === "completed")
+  };
 
   const onDragEnd = (result: any) => {
     const { destination, source, draggableId } = result;
 
-    if (!destination) {
-      return;
-    }
-
-    if (
+    if (!destination || (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
-    ) {
+    )) {
       return;
     }
 
-    const sourceColumn = tasks[source.droppableId as keyof typeof tasks];
-    const destColumn = tasks[destination.droppableId as keyof typeof tasks];
-    const draggedTask = sourceColumn.find(task => task.id === draggableId);
-
-    if (!draggedTask) return;
-
-    const newSourceColumn = sourceColumn.filter(task => task.id !== draggableId);
-    const newDestColumn = [...destColumn];
-    newDestColumn.splice(destination.index, 0, draggedTask);
-
-    setTasks({
-      ...tasks,
-      [source.droppableId]: newSourceColumn,
-      [destination.droppableId]: newDestColumn
+    updateTask.mutate({
+      id: draggableId,
+      status: destination.droppableId
     });
   };
+
+  const handleSaveTask = (taskData: Partial<Task>) => {
+    if (taskData.id) {
+      updateTask.mutate(taskData as Task & { id: string });
+    } else {
+      createTask.mutate(taskData as any);
+    }
+    setEditingTask(null);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setTaskDialogOpen(true);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    if (confirm("Are you sure you want to delete this task?")) {
+      deleteTask.mutate(taskId);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading tasks...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -144,185 +109,221 @@ export default function Workflow() {
             Manage your tasks with a powerful Kanban board
           </p>
         </div>
-        <Button 
-          className="bg-gradient-primary text-primary-foreground shadow-royal"
-          onClick={() => toast({
-            title: "Add Task",
-            description: "Task creation coming soon with backend integration.",
-          })}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Task
-        </Button>
+        <div className="flex items-center gap-4">
+          <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="All Projects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Projects</SelectItem>
+              {projects?.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button 
+            className="bg-gradient-primary text-primary-foreground shadow-royal"
+            onClick={() => {
+              setEditingTask(null);
+              setTaskDialogOpen(true);
+            }}
+            disabled={!selectedProject}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Task
+          </Button>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {Object.values(tasks).flat().length}
-                </p>
-                <p className="text-sm text-muted-foreground">Total Tasks</p>
-              </div>
-              <WorkflowIcon className="w-6 h-6 text-primary" />
-            </div>
+      {!selectedProject && (
+        <Card className="bg-muted/50 border-border">
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">
+              Please select a project to view and manage tasks
+            </p>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{tasks.todo.length}</p>
-                <p className="text-sm text-muted-foreground">To Do</p>
-              </div>
-              <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {selectedProject && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">
+                      {tasks.length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Total Tasks</p>
+                  </div>
+                  <WorkflowIcon className="w-6 h-6 text-primary" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{tasks.doing.length}</p>
-                <p className="text-sm text-muted-foreground">In Progress</p>
-              </div>
-              <div className="w-6 h-6 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-yellow-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{tasksByStatus.pending.length}</p>
+                    <p className="text-sm text-muted-foreground">To Do</p>
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{tasks.done.length}</p>
-                <p className="text-sm text-muted-foreground">Completed</p>
-              </div>
-              <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{tasksByStatus.in_progress.length}</p>
+                    <p className="text-sm text-muted-foreground">In Progress</p>
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* Kanban Board */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {columns.map((column) => (
-            <Card key={column.id} className={`bg-card border-border shadow-card ${column.color} border-l-4`}>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{column.title}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {tasks[column.id as keyof typeof tasks].length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Droppable droppableId={column.id}>
-                  {(provided, snapshot) => (
-                    <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
-                      className={`space-y-3 min-h-[400px] ${
-                        snapshot.isDraggingOver ? 'bg-muted/30 rounded-lg' : ''
-                      }`}
-                    >
-                      {tasks[column.id as keyof typeof tasks].map((task, index) => (
-                        <Draggable key={task.id} draggableId={task.id} index={index}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`p-4 rounded-lg bg-muted border border-border hover:shadow-glow transition-royal ${
-                                snapshot.isDragging ? 'shadow-royal rotate-2' : ''
-                              }`}
-                            >
-                              <div className="space-y-3">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className="font-semibold text-foreground flex-1">{task.title}</h4>
-                                  <div className="flex items-center gap-2">
-                                    {/* Chakra Energy Indicator */}
-                                    <div 
-                                      className="relative flex items-center gap-1.5 px-2 py-1 rounded-md border"
-                                      style={{
-                                        borderColor: chakraCategories[task.chakra_category].color,
-                                        backgroundColor: `${chakraCategories[task.chakra_category].color.replace(')', ' / 0.1)')}`
-                                      }}
-                                      title={`${chakraCategories[task.chakra_category].label} Energy: ${chakraCategories[task.chakra_category].description}`}
-                                    >
-                                      <div 
-                                        className="w-2 h-2 rounded-full animate-pulse"
-                                        style={{
-                                          backgroundColor: chakraCategories[task.chakra_category].color
-                                        }}
-                                      />
-                                      <span 
-                                        className="text-xs font-medium"
-                                        style={{
-                                          color: chakraCategories[task.chakra_category].color
-                                        }}
-                                      >
-                                        {chakraCategories[task.chakra_category].label}
-                                      </span>
+            <Card className="bg-gradient-subtle border-border shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{tasksByStatus.completed.length}</p>
+                    <p className="text-sm text-muted-foreground">Completed</p>
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Kanban Board */}
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {columns.map((column) => (
+                <Card key={column.id} className={`bg-card border-border shadow-card ${column.color} border-l-4`}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{column.title}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {tasksByStatus[column.id as keyof typeof tasksByStatus].length}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Droppable droppableId={column.id}>
+                      {(provided, snapshot) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className={`space-y-3 min-h-[400px] ${
+                            snapshot.isDraggingOver ? 'bg-muted/30 rounded-lg' : ''
+                          }`}
+                        >
+                          {tasksByStatus[column.id as keyof typeof tasksByStatus].map((task, index) => (
+                            <Draggable key={task.id} draggableId={task.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`p-4 rounded-lg bg-muted border border-border hover:shadow-glow transition-royal ${
+                                    snapshot.isDragging ? 'shadow-royal rotate-2' : ''
+                                  }`}
+                                >
+                                  <div className="space-y-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <h4 className="font-semibold text-foreground flex-1">{task.title}</h4>
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 w-7 p-0"
+                                          onClick={() => handleEditTask(task)}
+                                        >
+                                          <Edit className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 w-7 p-0 text-destructive"
+                                          onClick={() => handleDeleteTask(task.id)}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </div>
                                     </div>
-                                    {/* Priority Badge */}
-                                    <Badge 
-                                      className={priorityColors[task.priority as keyof typeof priorityColors]}
-                                    >
+
+                                    <Badge className={priorityColors[task.priority]}>
                                       <Flag className="w-3 h-3 mr-1" />
                                       {task.priority}
                                     </Badge>
+                                    
+                                    {task.description && (
+                                      <p className="text-sm text-muted-foreground line-clamp-2">
+                                        {task.description}
+                                      </p>
+                                    )}
+                                    
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                      {task.assignee && (
+                                        <div className="flex items-center gap-1">
+                                          <User className="w-3 h-3" />
+                                          {task.assignee}
+                                        </div>
+                                      )}
+                                      {task.due_date && (
+                                        <div className="flex items-center gap-1">
+                                          <Calendar className="w-3 h-3" />
+                                          {new Date(task.due_date).toLocaleDateString()}
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    {task.tags && task.tags.length > 0 && (
+                                      <div className="flex flex-wrap gap-1">
+                                        {task.tags.map((tag) => (
+                                          <Badge key={tag} variant="outline" className="text-xs">
+                                            {tag}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                                
-                                <p className="text-sm text-muted-foreground line-clamp-2">
-                                  {task.description}
-                                </p>
-                                
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <User className="w-3 h-3" />
-                                    {task.assignee}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    {new Date(task.dueDate).toLocaleDateString()}
-                                  </div>
-                                </div>
-                                
-                                <div className="flex flex-wrap gap-1">
-                                  {task.tags.map((tag) => (
-                                    <Badge key={tag} variant="outline" className="text-xs">
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </DragDropContext>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </DragDropContext>
+        </>
+      )}
+
+      <TaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        onSave={handleSaveTask}
+        task={editingTask}
+        projectId={selectedProject}
+      />
     </div>
   );
 }

@@ -23,7 +23,7 @@ const priorityColors = {
 };
 
 export default function Workflow() {
-  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedProject, setSelectedProject] = useState<string | undefined>(undefined);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -115,7 +115,6 @@ export default function Workflow() {
               <SelectValue placeholder="All Projects" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Projects</SelectItem>
               {projects?.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.name}

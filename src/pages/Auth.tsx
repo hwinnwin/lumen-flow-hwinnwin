@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import lumenLogo from "@/assets/lumen-logo.png";
+import { logger } from "@/lib/logger";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -52,14 +53,34 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const authLogger = logger.forComponent('Auth');
     
     try {
+      authLogger.debug('Login form validation started', {
+        operation: 'handleLogin',
+        context: { email: loginForm.email }
+      });
+      
       loginSchema.parse(loginForm);
       setLoading(true);
+
+      authLogger.info('Login form validated, calling signIn', {
+        operation: 'handleLogin',
+        context: { email: loginForm.email }
+      });
 
       const { error } = await signIn(loginForm.email, loginForm.password);
 
       if (error) {
+        authLogger.error('Login error received from AuthContext', {
+          operation: 'handleLogin',
+          error,
+          context: { 
+            email: loginForm.email,
+            errorMessage: error.message 
+          }
+        });
+        
         if (error.message.includes("Invalid login credentials")) {
           toast({
             title: "Login failed",
@@ -76,6 +97,11 @@ export default function Auth() {
         return;
       }
 
+      authLogger.info('Login successful, redirecting', {
+        operation: 'handleLogin',
+        context: { email: loginForm.email }
+      });
+
       toast({
         title: "Welcome back!",
         description: "You've successfully signed in",
@@ -83,10 +109,25 @@ export default function Auth() {
       navigate("/");
     } catch (error) {
       if (error instanceof z.ZodError) {
+        authLogger.warn('Login form validation failed', {
+          operation: 'handleLogin',
+          error,
+          context: { 
+            email: loginForm.email,
+            validationErrors: error.issues 
+          }
+        });
+        
         toast({
           title: "Validation error",
           description: error.issues[0].message,
           variant: "destructive",
+        });
+      } else {
+        authLogger.error('Unexpected error during login', {
+          operation: 'handleLogin',
+          error,
+          context: { email: loginForm.email }
         });
       }
     } finally {
@@ -96,10 +137,27 @@ export default function Auth() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    const authLogger = logger.forComponent('Auth');
     
     try {
+      authLogger.debug('Signup form validation started', {
+        operation: 'handleSignup',
+        context: { 
+          email: signupForm.email,
+          fullName: signupForm.fullName 
+        }
+      });
+      
       signupSchema.parse(signupForm);
       setLoading(true);
+
+      authLogger.info('Signup form validated, calling signUp', {
+        operation: 'handleSignup',
+        context: { 
+          email: signupForm.email,
+          fullName: signupForm.fullName 
+        }
+      });
 
       const { error } = await signUp(
         signupForm.email,
@@ -108,6 +166,17 @@ export default function Auth() {
       );
 
       if (error) {
+        authLogger.error('Signup error received from AuthContext', {
+          operation: 'handleSignup',
+          error,
+          context: { 
+            email: signupForm.email,
+            fullName: signupForm.fullName,
+            errorMessage: error.message,
+            errorStatus: error.status 
+          }
+        });
+        
         if (error.message.includes("already registered")) {
           toast({
             title: "Account exists",
@@ -124,6 +193,14 @@ export default function Auth() {
         return;
       }
 
+      authLogger.info('Signup successful, redirecting', {
+        operation: 'handleSignup',
+        context: { 
+          email: signupForm.email,
+          fullName: signupForm.fullName 
+        }
+      });
+
       toast({
         title: "Account created!",
         description: "Welcome to Lumen Flow",
@@ -131,10 +208,29 @@ export default function Auth() {
       navigate("/");
     } catch (error) {
       if (error instanceof z.ZodError) {
+        authLogger.warn('Signup form validation failed', {
+          operation: 'handleSignup',
+          error,
+          context: { 
+            email: signupForm.email,
+            fullName: signupForm.fullName,
+            validationErrors: error.issues 
+          }
+        });
+        
         toast({
           title: "Validation error",
           description: error.issues[0].message,
           variant: "destructive",
+        });
+      } else {
+        authLogger.error('Unexpected error during signup', {
+          operation: 'handleSignup',
+          error,
+          context: { 
+            email: signupForm.email,
+            fullName: signupForm.fullName 
+          }
         });
       }
     } finally {
@@ -143,10 +239,21 @@ export default function Auth() {
   };
 
   const handleGoogleSignIn = async () => {
+    const authLogger = logger.forComponent('Auth');
+    
+    authLogger.info('Google sign-in button clicked', {
+      operation: 'handleGoogleSignIn'
+    });
+    
     setLoading(true);
     const { error } = await signInWithGoogle();
     
     if (error) {
+      authLogger.error('Google sign-in failed', {
+        operation: 'handleGoogleSignIn',
+        error
+      });
+      
       toast({
         title: "Google sign-in failed",
         description: error.message,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Workflow as WorkflowIcon, Plus, Calendar, User, Flag, Trash2, Edit } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { TaskDialog } from "@/components/workflow/TaskDialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { APP_CONFIG } from "@/config/appConfig";
+import { toast } from "@/hooks/use-toast";
 
 const columns = [
   { id: "pending", title: "To Do", color: "border-blue-500" },
@@ -38,6 +40,42 @@ export default function Workflow() {
       return data;
     },
   });
+
+  // Auto-create and select a default project if none exists
+  useEffect(() => {
+    const ensureProject = async () => {
+      if (!projects) return;
+      
+      if (projects.length === 0) {
+        // Auto-create a default project
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data: newProject, error } = await supabase
+          .from('projects')
+          .insert({
+            user_id: user.id,
+            name: 'My Workflow',
+            description: 'Default project for tasks'
+          })
+          .select('id')
+          .single();
+        
+        if (!error && newProject) {
+          setSelectedProject(newProject.id);
+          toast({
+            title: "Project created",
+            description: "A default project has been created for your tasks",
+          });
+        }
+      } else {
+        // Auto-select first project
+        setSelectedProject(projects[0].id);
+      }
+    };
+    
+    ensureProject();
+  }, [projects]);
 
   const { data: tasks = [], isLoading } = useTasks(selectedProject || undefined);
   const createTask = useCreateTask();
@@ -112,7 +150,7 @@ export default function Workflow() {
         <div className="flex items-center gap-4">
           <Select value={selectedProject} onValueChange={setSelectedProject}>
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Projects" />
+              <SelectValue placeholder="Select Project" />
             </SelectTrigger>
             <SelectContent>
               {projects?.map((project) => (
@@ -128,7 +166,6 @@ export default function Workflow() {
               setEditingTask(null);
               setTaskDialogOpen(true);
             }}
-            disabled={!selectedProject}
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Task

@@ -1,8 +1,14 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { APP_CONFIG } from "@/config/appConfig";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+
+  // Allow access in demo mode without authentication
+  if (APP_CONFIG.demoMode) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (

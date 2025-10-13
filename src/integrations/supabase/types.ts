@@ -219,6 +219,42 @@ export type Database = {
           },
         ]
       }
+      insights: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string
+          id: string
+          is_favorite: boolean | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_favorite?: boolean | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_favorite?: boolean | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       principles: {
         Row: {
           category: string | null

@@ -1,295 +1,351 @@
-import { Calendar, Clock, Target, Lightbulb, BookOpen, TrendingUp } from "lucide-react";
+import { 
+  Calendar, 
+  Target, 
+  Lightbulb, 
+  BookOpen, 
+  TrendingUp, 
+  Sparkles, 
+  CheckCircle2, 
+  AlertCircle, 
+  Clock,
+  RefreshCw,
+  ArrowRight,
+  Activity
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useDailyFocus, useGenerateDailyFocus, type TopAction } from "@/hooks/useDailyFocus";
 import { SimpleSkeleton } from "@/components/ui/SimpleSkeleton";
-import { chakraCategories, type ChakraCategory } from "@/lib/chakraSystem";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import { useEffect } from "react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { data: dailyFocus, isLoading, refetch } = useDailyFocus();
+  const generateFocus = useGenerateDailyFocus();
 
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
-    queryKey: ["dashboard-tasks"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("tasks")
-        .select("*")
-        .order("due_date", { ascending: true })
-        .limit(3);
-      return data || [];
-    },
-  });
+  // Auto-generate if no focus exists for today
+  useEffect(() => {
+    if (!isLoading && !dailyFocus && !generateFocus.isPending) {
+      generateFocus.mutate();
+    }
+  }, [isLoading, dailyFocus]);
 
-  const { data: principles = [], isLoading: principlesLoading } = useQuery({
-    queryKey: ["dashboard-principles"],
-    queryFn: async () => {
-      const { data } = await supabase.from("principles").select("*").limit(3);
-      return data || [];
-    },
-  });
+  const isLoadingFocus = isLoading || generateFocus.isPending;
 
-  const { data: insights = [], isLoading: insightsLoading } = useQuery({
-    queryKey: ["dashboard-insights"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("insights")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      return data || [];
-    },
-  });
-
-  const { data: sops = [], isLoading: sopsLoading } = useQuery({
-    queryKey: ["dashboard-sops"],
-    queryFn: async () => {
-      const { data } = await supabase.from("sops").select("*").limit(3);
-      return data || [];
-    },
-  });
-
-  const isLoading = tasksLoading || principlesLoading || insightsLoading || sopsLoading;
-
-  if (isLoading) {
+  if (isLoadingFocus) {
     return (
       <div className="space-y-6">
-        <SimpleSkeleton className="h-32 w-full" />
-        <SimpleSkeleton className="h-64 w-full" />
+        <SimpleSkeleton className="h-48 w-full" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SimpleSkeleton className="h-64 w-full" />
+          <SimpleSkeleton className="h-64 w-full" />
+          <SimpleSkeleton className="h-64 w-full" />
+        </div>
       </div>
     );
   }
 
+  const focusTheme = dailyFocus?.focus_theme;
+  const topActions = dailyFocus?.top_actions || [];
+  const projectHealth = dailyFocus?.project_health || [];
+  const insights = dailyFocus?.insights || [];
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'text-red-500 bg-red-500/10 border-red-500/20';
+      case 'medium': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+      case 'low': return 'text-green-500 bg-green-500/10 border-green-500/20';
+      default: return 'text-muted-foreground bg-muted';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'on_track': return 'text-green-500';
+      case 'needs_attention': return 'text-yellow-500';
+      case 'at_risk': return 'text-orange-500';
+      case 'blocked': return 'text-red-500';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'on_track': return <CheckCircle2 className="w-4 h-4" />;
+      case 'needs_attention': return <AlertCircle className="w-4 h-4" />;
+      case 'at_risk': return <AlertCircle className="w-4 h-4" />;
+      case 'blocked': return <AlertCircle className="w-4 h-4" />;
+      default: return <Activity className="w-4 h-4" />;
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent">
-            Good morning, Flow Builder
+          <h1 className="text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent flex items-center gap-2">
+            <Sparkles className="w-8 h-8 text-primary" />
+            Your Focus Today
           </h1>
           <p className="text-muted-foreground mt-1">
-            Here's your daily digest to conquer the day
+            AI-powered priority intelligence based on your principles
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="w-4 h-4" />
-          {new Date().toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="w-4 h-4" />
+            {new Date().toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => generateFocus.mutate()}
+            disabled={generateFocus.isPending}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${generateFocus.isPending ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{tasks.length}</p>
-                <p className="text-sm text-muted-foreground">Active Tasks</p>
+      {/* Hero Section: Today's Focus Theme */}
+      {focusTheme && (
+        <Card className="bg-gradient-primary border-primary/20 shadow-elegant">
+          <CardContent className="p-8">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-primary-foreground mb-2">
+                  🎯 {focusTheme.title}
+                </h2>
+                <p className="text-primary-foreground/90 text-lg leading-relaxed">
+                  {focusTheme.description}
+                </p>
               </div>
-              <Target className="w-8 h-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{principles.length}</p>
-                <p className="text-sm text-muted-foreground">Principles</p>
-              </div>
-              <BookOpen className="w-8 h-8 text-accent" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{insights.length}</p>
-                <p className="text-sm text-muted-foreground">Insights</p>
-              </div>
-              <Lightbulb className="w-8 h-8 text-primary-glow" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{sops.length}</p>
-                <p className="text-sm text-muted-foreground">SOPs</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's Tasks */}
-        <Card className="bg-card border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-primary" />
-              Priority Tasks
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {tasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No tasks yet. Create one in Workflow!</p>
-                  <Button 
-                    className="mt-4" 
-                    size="sm"
-                    onClick={() => navigate('/workflow')}
-                  >
-                    Go to Workflow
-                  </Button>
+              <div className="ml-6 text-right">
+                <div className="text-4xl font-bold text-primary-foreground mb-1">
+                  {focusTheme.priority_score}
+                  <span className="text-lg">/100</span>
                 </div>
-              ) : (
-                <>
-                  {tasks.map((task) => (
-                    <div key={task.id} className="p-3 rounded-lg bg-muted hover:bg-muted/80 transition-smooth">
-                      <p className="font-medium text-foreground mb-2">{task.title}</p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {task.due_date && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            <span>{new Date(task.due_date).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {task.priority && (
-                          <Badge 
-                            className={
-                              task.priority === 'high' 
-                                ? 'bg-red-500/10 text-red-500 border-red-500/20 text-xs' 
-                                : task.priority === 'medium' 
-                                ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-xs' 
-                                : 'bg-green-500/10 text-green-500 border-green-500/20 text-xs'
-                            }
-                          >
-                            {task.priority}
-                          </Badge>
-                        )}
+                <div className="text-sm text-primary-foreground/80">Priority Score</div>
+                <Progress 
+                  value={focusTheme.priority_score} 
+                  className="w-24 mt-2 h-2 bg-primary-foreground/20"
+                />
+              </div>
+            </div>
+            {focusTheme.aligned_principles && focusTheme.aligned_principles.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap mt-4">
+                <span className="text-sm text-primary-foreground/80">Aligned Principles:</span>
+                {focusTheme.aligned_principles.map((principle, i) => (
+                  <Badge key={i} variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-primary-foreground/30">
+                    ✓ {principle}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top 3 Priority Actions */}
+      {topActions.length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5 text-primary" />
+            What Matters Most
+          </h2>
+          <div className="space-y-4">
+            {topActions.slice(0, 3).map((action: TopAction, index: number) => (
+              <Card key={index} className="bg-card border-border shadow-card hover:shadow-elegant transition-smooth">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Badge className={getPriorityColor(action.priority)}>
+                          {action.priority === 'high' ? '🔴' : action.priority === 'medium' ? '🟡' : '🟢'} {action.priority.toUpperCase()}
+                        </Badge>
+                        <h3 className="text-lg font-semibold text-foreground">
+                          {action.title}
+                        </h3>
+                      </div>
+                      
+                      <div className="space-y-2 mb-4">
+                        <div>
+                          <span className="text-sm font-medium text-muted-foreground">Why: </span>
+                          <span className="text-sm text-foreground">{action.why}</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-muted-foreground">Impact: </span>
+                          <span className="text-sm text-foreground">{action.impact}</span>
+                        </div>
+                      </div>
+
+                      {(action.related_docs?.length || action.related_sops?.length) && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+                          <BookOpen className="w-3 h-3" />
+                          <span>
+                            Related resources: {action.related_docs?.length || 0} docs, {action.related_sops?.length || 0} SOPs
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button className="bg-gradient-primary text-primary-foreground shadow-glow">
+                      {action.quick_action}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Project Health */}
+        {projectHealth.length > 0 && (
+          <Card className="bg-card border-border shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                Project Health
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {projectHealth.map((project, index) => (
+                  <div key={index} className="p-4 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={getStatusColor(project.status)}>
+                            {getStatusIcon(project.status)}
+                          </span>
+                          <h4 className="font-semibold text-foreground">{project.project_name}</h4>
+                        </div>
+                        <Badge className="text-xs" variant="outline">
+                          {project.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-foreground">{project.health_score}%</div>
+                        <div className="text-xs text-muted-foreground">Health</div>
                       </div>
                     </div>
-                  ))}
-                  <Button 
-                    className="w-full mt-4 bg-gradient-primary text-primary-foreground" 
-                    size="sm"
-                    onClick={() => navigate('/workflow')}
-                  >
-                    View All Tasks
-                  </Button>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Principles */}
-        <Card className="bg-card border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-accent" />
-              Recent Principles
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {principles.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No principles yet. Add one!</p>
-                  <Button 
-                    variant="outline" 
-                    className="mt-4" 
-                    size="sm"
-                    onClick={() => navigate('/principles')}
-                  >
-                    Go to Principles
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {principles.map((principle) => (
-                    <div key={principle.id} className="p-4 rounded-lg bg-gradient-subtle border border-border">
-                      <h3 className="font-semibold text-foreground mb-2">{principle.title}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{principle.content}</p>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Next: </span>
+                        <span className="text-foreground">{project.next_milestone}</span>
+                      </div>
+                      {project.blocking_issue && (
+                        <Alert className="border-yellow-500/20 bg-yellow-500/5">
+                          <AlertCircle className="w-4 h-4 text-yellow-500" />
+                          <AlertDescription className="text-xs text-yellow-700 dark:text-yellow-400">
+                            {project.blocking_issue}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      <div className="pt-2 border-t border-border">
+                        <span className="text-xs text-muted-foreground">AI Suggests: </span>
+                        <span className="text-xs text-foreground">{project.ai_recommendation}</span>
+                      </div>
+                      <Progress value={project.principle_alignment} className="h-1" />
+                      <div className="text-xs text-muted-foreground">
+                        {project.principle_alignment}% principle alignment
+                      </div>
                     </div>
-                  ))}
-                  <Button 
-                    variant="outline" 
-                    className="w-full" 
-                    size="sm"
-                    onClick={() => navigate('/principles')}
-                  >
-                    View All Principles
-                  </Button>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Recent Insights */}
-        <Card className="bg-card border-border shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lightbulb className="w-5 h-5 text-primary-glow" />
-              Recent Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {insights.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No insights yet. Create one!</p>
-                  <Button 
-                    variant="outline" 
-                    className="mt-4" 
-                    size="sm"
-                    onClick={() => navigate('/insights')}
-                  >
-                    Go to Insights
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {insights.map((insight) => (
-                    <div key={insight.id} className="p-3 rounded-lg bg-muted hover:bg-muted/80 transition-smooth">
-                      <h4 className="font-medium text-foreground text-sm">{insight.title}</h4>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{insight.content}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(insight.created_at).toLocaleDateString()}
-                      </span>
+        {/* Knowledge Insights */}
+        {insights.length > 0 && (
+          <Card className="bg-card border-border shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="w-5 h-5 text-primary-glow" />
+                Knowledge Insights
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {insights.map((insight, index) => (
+                  <div key={index} className="p-4 rounded-lg bg-gradient-subtle border border-border">
+                    <div className="flex items-start gap-3">
+                      <div className="text-2xl">
+                        {insight.type === 'pattern' && '📊'}
+                        {insight.type === 'risk' && '⚠️'}
+                        {insight.type === 'opportunity' && '💡'}
+                        {insight.type === 'connection' && '🔗'}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-foreground mb-1">{insight.title}</h4>
+                        <p className="text-sm text-muted-foreground mb-2">{insight.description}</p>
+                        <div className="text-xs text-primary font-medium">
+                          → {insight.action}
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                  <Button 
-                    variant="outline" 
-                    className="w-full mt-4" 
-                    size="sm"
-                    onClick={() => navigate('/insights')}
-                  >
-                    View All Insights
-                  </Button>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Conversation Starters */}
+      <Card className="bg-gradient-subtle border-border shadow-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Ask Lumen
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[
+              "What's blocking my highest priority project?",
+              "Show me documents related to today's focus",
+              "Help me plan next week's priorities",
+              "Analyze my workflow efficiency",
+            ].map((question, index) => (
+              <Button
+                key={index}
+                variant="outline"
+                className="justify-start text-left h-auto py-3 px-4 hover:bg-primary/5 hover:border-primary/30"
+                onClick={() => navigate('/assistant')}
+              >
+                <span className="text-sm">{question}</span>
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {!dailyFocus && !isLoadingFocus && (
+        <Alert>
+          <Sparkles className="w-4 h-4" />
+          <AlertDescription>
+            No daily focus generated yet. Click the Refresh button to generate your personalized daily plan.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

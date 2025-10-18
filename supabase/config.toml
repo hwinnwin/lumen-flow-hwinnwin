@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.chat-assistant]
 verify_jwt = true
+
+[functions.generate-daily-focus]
+verify_jwt = true

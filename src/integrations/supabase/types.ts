@@ -262,6 +262,42 @@ export type Database = {
           },
         ]
       }
+      daily_focus: {
+        Row: {
+          date: string
+          focus_theme: Json
+          generated_at: string
+          id: string
+          insights: Json
+          project_health: Json
+          top_actions: Json
+          user_id: string
+          user_overrides: Json | null
+        }
+        Insert: {
+          date: string
+          focus_theme?: Json
+          generated_at?: string
+          id?: string
+          insights?: Json
+          project_health?: Json
+          top_actions?: Json
+          user_id: string
+          user_overrides?: Json | null
+        }
+        Update: {
+          date?: string
+          focus_theme?: Json
+          generated_at?: string
+          id?: string
+          insights?: Json
+          project_health?: Json
+          top_actions?: Json
+          user_id?: string
+          user_overrides?: Json | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           ai_confidence: number | null
@@ -461,6 +497,45 @@ export type Database = {
           },
         ]
       }
+      focus_actions: {
+        Row: {
+          action_id: string
+          completed_at: string | null
+          created_at: string
+          deferred: boolean | null
+          id: string
+          ignored: boolean | null
+          priority_level: string
+          time_to_complete: unknown | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          action_id: string
+          completed_at?: string | null
+          created_at?: string
+          deferred?: boolean | null
+          id?: string
+          ignored?: boolean | null
+          priority_level: string
+          time_to_complete?: unknown | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          action_id?: string
+          completed_at?: string | null
+          created_at?: string
+          deferred?: boolean | null
+          id?: string
+          ignored?: boolean | null
+          priority_level?: string
+          time_to_complete?: unknown | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       insights: {
         Row: {
           category: string | null
@@ -529,6 +604,39 @@ export type Database = {
           priority?: string | null
           title?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      priority_learning: {
+        Row: {
+          ai_suggested: boolean
+          created_at: string
+          id: string
+          learned_pattern: string | null
+          outcome: string | null
+          prediction_type: string
+          user_followed: boolean
+          user_id: string
+        }
+        Insert: {
+          ai_suggested?: boolean
+          created_at?: string
+          id?: string
+          learned_pattern?: string | null
+          outcome?: string | null
+          prediction_type: string
+          user_followed?: boolean
+          user_id: string
+        }
+        Update: {
+          ai_suggested?: boolean
+          created_at?: string
+          id?: string
+          learned_pattern?: string | null
+          outcome?: string | null
+          prediction_type?: string
+          user_followed?: boolean
           user_id?: string
         }
         Relationships: []

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useDocuments, useCreateDocument, useDeleteDocument } from "@/hooks/useDocuments";
 import { supabase } from "@/integrations/supabase/client";
 import { extractFileContent, isFileTypeSupported, getFileTypeLabel, formatFileSize, SUPPORTED_FILE_TYPES } from "@/lib/fileParser";
-import { Upload, FileText, Search, Filter, Download, Trash2, X, CheckCircle, Loader2 } from "lucide-react";
+import { Upload, FileText, Search, Filter, Download, Trash2, X, CheckCircle, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import { SimpleSkeleton } from "@/components/ui/SimpleSkeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface UploadingFile {
   file: File;
@@ -21,10 +22,24 @@ interface UploadingFile {
   status: 'uploading' | 'processing' | 'categorizing' | 'reviewing' | 'complete' | 'error';
   error?: string;
   aiSuggestion?: {
+    principle_alignment?: {
+      primary_principle_id: string | null;
+      primary_principle_name: string;
+      alignment_explanation: string;
+      serves_goal: string;
+    };
     category: string;
+    confidence: number;
+    reasoning: string;
     title: string;
     summary: string;
     tags: string[];
+    related_items?: {
+      sop_ids: string[];
+      document_ids: string[];
+      reasoning: string;
+    };
+    suggested_actions?: string[];
     data_description?: string;
   };
   editedData?: {
@@ -32,6 +47,7 @@ interface UploadingFile {
     title: string;
     summary: string;
     tags: string;
+    primary_principle_id: string | null;
   };
 }
 
@@ -47,6 +63,27 @@ export default function Library() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedFileType, setSelectedFileType] = useState("All");
+  const [principles, setPrinciples] = useState<any[]>([]);
+  const [noPrinciples, setNoPrinciples] = useState(false);
+
+  // Fetch principles on mount
+  useEffect(() => {
+    const fetchPrinciples = async () => {
+      const { data, error } = await supabase
+        .from('principles')
+        .select('id, title, description, priority')
+        .order('priority', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching principles:', error);
+      } else {
+        setPrinciples(data || []);
+        setNoPrinciples(!data || data.length === 0);
+      }
+    };
+    
+    fetchPrinciples();
+  }, []);
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -119,12 +156,14 @@ export default function Library() {
       
       updateFileStatus(index, { progress: 60, status: 'categorizing' });
 
-      // Call AI categorization
+      // Call AI categorization with enhanced context
       const { data: aiData, error: aiError } = await supabase.functions.invoke('categorize-document', {
         body: { 
           content, 
           fileName: file.name,
-          fileType: file.type 
+          fileType: file.type,
+          userId: user.id,
+          projectId: null // TODO: Add project context if applicable
         }
       });
 
@@ -139,6 +178,7 @@ export default function Library() {
           title: aiData.title,
           summary: aiData.summary,
           tags: aiData.tags.join(', '),
+          primary_principle_id: aiData.principle_alignment?.primary_principle_id || null,
         }
       });
 
@@ -159,7 +199,7 @@ export default function Library() {
     });
   };
 
-  const handleEditField = (index: number, field: keyof UploadingFile['editedData'], value: string) => {
+  const handleEditField = (index: number, field: keyof UploadingFile['editedData'], value: string | null) => {
     setUploadingFiles(prev => {
       const newFiles = [...prev];
       newFiles[index] = {
@@ -188,7 +228,15 @@ export default function Library() {
         .from('documents')
         .getPublicUrl(filePath);
 
-      await createDocument.mutateAsync({
+      // Check if user changed AI suggestion
+      const userOverride = 
+        editedData.category !== aiSuggestion?.category ||
+        editedData.title !== aiSuggestion?.title ||
+        editedData.summary !== aiSuggestion?.summary ||
+        editedData.tags !== aiSuggestion?.tags.join(', ') ||
+        editedData.primary_principle_id !== aiSuggestion?.principle_alignment?.primary_principle_id;
+
+      const result = await createDocument.mutateAsync({
         file_name: file.name,
         file_type: file.type,
         file_url: publicUrl,
@@ -198,7 +246,29 @@ export default function Library() {
         summary: editedData.summary,
         tags: editedData.tags.split(',').map(t => t.trim()).filter(Boolean),
         data_description: aiSuggestion?.data_description,
+        primary_principle_id: editedData.primary_principle_id || null,
+        principle_alignment_score: aiSuggestion?.principle_alignment ? 
+          Math.round((aiSuggestion.confidence / 100) * 100) : null,
+        ai_confidence: aiSuggestion?.confidence || null,
+        ai_reasoning: aiSuggestion?.reasoning || null,
+        user_override: userOverride,
       });
+
+      // Log learning if user made corrections
+      if (userOverride && aiSuggestion && result) {
+        await supabase.from('ai_learning_log').insert([{
+          user_id: user.id,
+          document_id: result.id,
+          ai_suggestion: aiSuggestion as any,
+          user_choice: editedData as any,
+          correction_type: 'categorization',
+        }]);
+        
+        toast({
+          title: "Learning applied",
+          description: "Thanks! I'll learn from your corrections.",
+        });
+      }
 
       updateFileStatus(index, { status: 'complete' });
 
@@ -264,11 +334,35 @@ export default function Library() {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Document Library</h1>
-            <p className="text-muted-foreground">Upload and organize your documents with AI-powered categorization</p>
+        {/* Header */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Document Library</h1>
+              <p className="text-muted-foreground">Every document has purpose and place, flowing from your principles</p>
+            </div>
           </div>
+          
+          {/* Principles CTA */}
+          {noPrinciples && (
+            <Alert className="border-primary/50 bg-primary/5">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <AlertDescription className="flex items-center justify-between">
+                <span>
+                  Define your guiding principles to unlock principle-driven categorization. 
+                  The AI will understand your values and help organize documents accordingly.
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.href = '/principles'}
+                  className="ml-4 whitespace-nowrap"
+                >
+                  Add Principles
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         {/* Upload Area */}
@@ -347,6 +441,114 @@ export default function Library() {
 
                   {uploadFile.status === 'reviewing' && uploadFile.editedData && (
                     <div className="space-y-4">
+                      {/* No Principles Warning */}
+                      {noPrinciples && (
+                        <Alert className="border-amber-500/50 bg-amber-500/10">
+                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                          <AlertDescription>
+                            No guiding principles found. Consider adding principles to help AI understand your organizational values and improve categorization.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {/* Principle Alignment - STAR Section */}
+                      {uploadFile.aiSuggestion?.principle_alignment && (
+                        <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-primary" />
+                            <h3 className="font-semibold text-lg">Principle Alignment</h3>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-muted-foreground">Serves Principle:</p>
+                                <p className="text-base font-semibold">
+                                  {uploadFile.aiSuggestion.principle_alignment.primary_principle_name}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground mb-1">How it aligns:</p>
+                              <p className="text-sm leading-relaxed">
+                                {uploadFile.aiSuggestion.principle_alignment.alignment_explanation}
+                              </p>
+                            </div>
+                            
+                            {uploadFile.aiSuggestion.principle_alignment.serves_goal && (
+                              <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">What it enables:</p>
+                                <p className="text-sm leading-relaxed">
+                                  {uploadFile.aiSuggestion.principle_alignment.serves_goal}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Confidence Indicator */}
+                      {uploadFile.aiSuggestion?.confidence !== undefined && (
+                        <div className={`p-3 rounded-md border ${
+                          uploadFile.aiSuggestion.confidence >= 80 
+                            ? 'bg-green-500/10 border-green-500/30' 
+                            : uploadFile.aiSuggestion.confidence >= 50 
+                            ? 'bg-amber-500/10 border-amber-500/30' 
+                            : 'bg-destructive/10 border-destructive/30'
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">
+                              AI Confidence: {uploadFile.aiSuggestion.confidence}%
+                            </span>
+                            <Badge variant={
+                              uploadFile.aiSuggestion.confidence >= 80 ? 'default' :
+                              uploadFile.aiSuggestion.confidence >= 50 ? 'secondary' : 'destructive'
+                            }>
+                              {uploadFile.aiSuggestion.confidence >= 80 ? 'High' :
+                               uploadFile.aiSuggestion.confidence >= 50 ? 'Medium - Review' : 'Low - Input Needed'}
+                            </Badge>
+                          </div>
+                          <Progress 
+                            value={uploadFile.aiSuggestion.confidence} 
+                            className="h-2"
+                          />
+                        </div>
+                      )}
+
+                      {/* AI Reasoning */}
+                      {uploadFile.aiSuggestion?.reasoning && (
+                        <div className="p-3 bg-muted/50 rounded-md">
+                          <p className="text-sm font-medium mb-1">AI Reasoning:</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {uploadFile.aiSuggestion.reasoning}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Principle Selection */}
+                      {principles.length > 0 && (
+                        <div className="space-y-2">
+                          <Label>Primary Principle</Label>
+                          <Select
+                            value={uploadFile.editedData.primary_principle_id || 'none'}
+                            onValueChange={(value) => handleEditField(index, 'primary_principle_id', value === 'none' ? null : value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a principle" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {principles.map(principle => (
+                                <SelectItem key={principle.id} value={principle.id}>
+                                  {principle.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                         <Label>Category</Label>
                         <Select
@@ -390,6 +592,42 @@ export default function Library() {
                         />
                       </div>
 
+                      {/* Related Items */}
+                      {uploadFile.aiSuggestion?.related_items && (
+                        <div className="p-3 bg-muted/50 rounded-md space-y-2">
+                          <p className="text-sm font-medium">Related Items:</p>
+                          <p className="text-sm text-muted-foreground">
+                            {uploadFile.aiSuggestion.related_items.reasoning}
+                          </p>
+                          {(uploadFile.aiSuggestion.related_items.sop_ids?.length > 0 || 
+                            uploadFile.aiSuggestion.related_items.document_ids?.length > 0) && (
+                            <div className="flex gap-2 flex-wrap mt-2">
+                              {uploadFile.aiSuggestion.related_items.sop_ids?.map(id => (
+                                <Badge key={id} variant="outline">SOP</Badge>
+                              ))}
+                              {uploadFile.aiSuggestion.related_items.document_ids?.map(id => (
+                                <Badge key={id} variant="outline">Doc</Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Suggested Actions */}
+                      {uploadFile.aiSuggestion?.suggested_actions && uploadFile.aiSuggestion.suggested_actions.length > 0 && (
+                        <div className="p-3 bg-accent/10 rounded-md">
+                          <p className="text-sm font-medium mb-2">Suggested Actions:</p>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {uploadFile.aiSuggestion.suggested_actions.map((action, i) => (
+                              <li key={i} className="flex items-start gap-2">
+                                <span className="text-accent">→</span>
+                                <span>{action}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
                       {uploadFile.aiSuggestion?.data_description && (
                         <div className="p-3 bg-muted rounded-md">
                           <p className="text-sm font-medium mb-1">Data Description:</p>
@@ -397,11 +635,13 @@ export default function Library() {
                         </div>
                       )}
 
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 pt-2">
                         <Button onClick={() => handleConfirmDocument(index)} className="flex-1">
+                          <CheckCircle className="w-4 h-4 mr-2" />
                           Confirm & Save
                         </Button>
                         <Button variant="outline" onClick={() => handleRejectDocument(index)}>
+                          <X className="w-4 h-4 mr-2" />
                           Reject
                         </Button>
                       </div>

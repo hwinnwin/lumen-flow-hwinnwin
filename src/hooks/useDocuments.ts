@@ -17,6 +17,11 @@ export interface Document {
   linked_sop_id?: string;
   linked_principle_id?: string;
   linked_project_id?: string;
+  primary_principle_id?: string;
+  principle_alignment_score?: number;
+  ai_confidence?: number;
+  ai_reasoning?: string;
+  user_override?: boolean;
   created_at: string;
   updated_at: string;
 }

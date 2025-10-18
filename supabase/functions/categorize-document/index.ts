@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { content, fileName, fileType } = await req.json();
+    const { content, fileName, fileType, userId, projectId } = await req.json();
     
     if (!content) {
       throw new Error('No content provided');
@@ -22,28 +22,151 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    // Fetch user's guiding principles
+    const principlesResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/principles?user_id=eq.${userId}&select=id,title,description,priority`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    const principles = await principlesResponse.json();
+
+    // Fetch project context if applicable
+    let projectContext = '';
+    if (projectId) {
+      const projectResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}&select=name,description`,
+        {
+          headers: {
+            'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+        }
+      );
+      const projects = await projectResponse.json();
+      if (projects.length > 0) {
+        projectContext = `\nCurrent project: ${projects[0].name}${projects[0].description ? ' - ' + projects[0].description : ''}`;
+      }
+    }
+
+    // Fetch existing SOPs for context
+    const sopsResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/sops?user_id=eq.${userId}&select=id,title,category&limit=20`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    const sops = await sopsResponse.json();
+
+    // Fetch existing documents for context
+    const docsResponse = await fetch(
+      `${SUPABASE_URL}/rest/v1/documents?user_id=eq.${userId}&select=id,title,category&limit=20`,
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      }
+    );
+    const existingDocs = await docsResponse.json();
+
     // Determine if this is structured data
     const isStructuredData = ['json', 'csv', 'xml', 'yaml', 'yml', 'xlsx', 'xls'].some(
       ext => fileType.toLowerCase().includes(ext)
     );
 
-    const prompt = `Analyze this document and provide:
-1. Category (SOP, Principle, Project Note, or General Reference)
-2. Suggested title (if not clear from filename: "${fileName}")
-3. Brief summary (2-3 sentences)
-4. 3-5 relevant tags/keywords
+    const principlesText = principles.length > 0 
+      ? principles.map((p: any) => `- ${p.title}${p.description ? ': ' + p.description : ''}`).join('\n')
+      : 'No guiding principles defined yet.';
 
-${isStructuredData ? '5. Data description (what kind of data this contains)' : ''}
+    const sopsText = sops.length > 0
+      ? sops.map((s: any) => `- ${s.title} (${s.category || 'uncategorized'})`).join('\n')
+      : 'No SOPs defined yet.';
 
-Document content:
+    const docsText = existingDocs.length > 0
+      ? existingDocs.map((d: any) => `- ${d.title} (${d.category || 'uncategorized'})`).join('\n')
+      : 'No documents uploaded yet.';
+
+    const prompt = `You are an AI that operates from foundational principles. Your job is to understand documents through the lens of these principles and organizational context.
+
+FOUNDATIONAL PRINCIPLES:
+${principlesText}
+${projectContext}
+
+EXISTING LIBRARY CONTEXT:
+SOPs:
+${sopsText}
+
+Documents:
+${docsText}
+
+DOCUMENT TO ANALYZE:
+Filename: "${fileName}"
+Type: ${fileType}
+
+Content:
 ${content.substring(0, 8000)}
+
+ANALYSIS INSTRUCTIONS:
+Interpret this document through our principles. Instead of just categorizing, understand its PURPOSE and PLACE.
+
+1. **Principle Alignment** (MOST IMPORTANT):
+   - Which principle does this document most embody or serve?
+   - How does it align with each principle?
+   - What outcome does it enable?
+
+2. **Natural Categorization** (flows from principles):
+   - Based on principles and goals, what IS this document?
+   - Categories: SOP, Principle, Project Note, General Reference
+
+3. **Confidence & Reasoning**:
+   - Confidence score: 0-100
+   - Why this categorization flows from the principles
+
+4. **Relationships** (based on principle/goal alignment):
+   - Which existing SOPs serve the same principle?
+   - Which existing documents serve the same principle?
+   - Suggest connections based on shared purpose
+
+5. **Metadata**:
+   - Title (if unclear from filename)
+   - Summary (what it ENABLES, not just what it contains)
+   - Tags (prefer existing patterns, create new only if needed)
+${isStructuredData ? '\n6. **Data Description** (for structured files):\n   - What kind of data this contains\n   - How it might be used' : ''}
 
 Respond ONLY with valid JSON in this format:
 {
+  "principle_alignment": {
+    "primary_principle_id": "uuid or null if no principles exist",
+    "primary_principle_name": "string",
+    "alignment_explanation": "string",
+    "serves_goal": "string"
+  },
   "category": "string",
-  "title": "string", 
-  "summary": "string",
-  "tags": ["string"]${isStructuredData ? ',\n  "data_description": "string"' : ''}
+  "confidence": number (0-100),
+  "reasoning": "string (how this flows from principles)",
+  "title": "string",
+  "summary": "string (purpose-driven)",
+  "tags": ["string"],
+  "related_items": {
+    "sop_ids": ["uuid"],
+    "document_ids": ["uuid"],
+    "reasoning": "string (why these relate)"
+  },
+  "suggested_actions": ["string"]${isStructuredData ? ',\n  "data_description": "string"' : ''}
 }
 
 DO NOT OUTPUT ANYTHING OTHER THAN VALID JSON.`;

@@ -77,6 +77,44 @@ export type Database = {
           },
         ]
       }
+      ai_learning_log: {
+        Row: {
+          ai_suggestion: Json
+          correction_type: string | null
+          created_at: string | null
+          document_id: string
+          id: string
+          user_choice: Json
+          user_id: string
+        }
+        Insert: {
+          ai_suggestion: Json
+          correction_type?: string | null
+          created_at?: string | null
+          document_id: string
+          id?: string
+          user_choice: Json
+          user_id: string
+        }
+        Update: {
+          ai_suggestion?: Json
+          correction_type?: string | null
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          user_choice?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_learning_log_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           created_at: string | null
@@ -123,6 +161,8 @@ export type Database = {
       }
       documents: {
         Row: {
+          ai_confidence: number | null
+          ai_reasoning: string | null
           category: string | null
           created_at: string
           data_description: string | null
@@ -134,13 +174,18 @@ export type Database = {
           linked_principle_id: string | null
           linked_project_id: string | null
           linked_sop_id: string | null
+          primary_principle_id: string | null
+          principle_alignment_score: number | null
           summary: string | null
           tags: string[] | null
           title: string
           updated_at: string
           user_id: string
+          user_override: boolean | null
         }
         Insert: {
+          ai_confidence?: number | null
+          ai_reasoning?: string | null
           category?: string | null
           created_at?: string
           data_description?: string | null
@@ -152,13 +197,18 @@ export type Database = {
           linked_principle_id?: string | null
           linked_project_id?: string | null
           linked_sop_id?: string | null
+          primary_principle_id?: string | null
+          principle_alignment_score?: number | null
           summary?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
           user_id: string
+          user_override?: boolean | null
         }
         Update: {
+          ai_confidence?: number | null
+          ai_reasoning?: string | null
           category?: string | null
           created_at?: string
           data_description?: string | null
@@ -170,11 +220,14 @@ export type Database = {
           linked_principle_id?: string | null
           linked_project_id?: string | null
           linked_sop_id?: string | null
+          primary_principle_id?: string | null
+          principle_alignment_score?: number | null
           summary?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string
           user_id?: string
+          user_override?: boolean | null
         }
         Relationships: [
           {
@@ -196,6 +249,13 @@ export type Database = {
             columns: ["linked_sop_id"]
             isOneToOne: false
             referencedRelation: "sops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_primary_principle_id_fkey"
+            columns: ["primary_principle_id"]
+            isOneToOne: false
+            referencedRelation: "principles"
             referencedColumns: ["id"]
           },
         ]

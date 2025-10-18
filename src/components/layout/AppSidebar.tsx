@@ -10,7 +10,8 @@ import {
   Search,
   FileText,
   Star,
-  LogOut
+  LogOut,
+  Library
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +39,7 @@ const navigationItems = [
   { title: "Principles", url: "/principles", icon: Star },
   { title: "Codex", url: "/codex", icon: BookOpen },
   { title: "Insights", url: "/insights", icon: Lightbulb },
+  { title: "Library", url: "/library", icon: Library },
 ];
 
 export function AppSidebar() {

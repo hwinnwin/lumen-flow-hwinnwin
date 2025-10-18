@@ -13,6 +13,7 @@ import SOPs from "./pages/SOPs";
 import Principles from "./pages/Principles";
 import Codex from "./pages/Codex";
 import Insights from "./pages/Insights";
+import Library from "./pages/Library";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/principles" element={<ProtectedRoute><Layout><Principles /></Layout></ProtectedRoute>} />
             <Route path="/codex" element={<ProtectedRoute><Layout><Codex /></Layout></ProtectedRoute>} />
             <Route path="/insights" element={<ProtectedRoute><Layout><Insights /></Layout></ProtectedRoute>} />
+            <Route path="/library" element={<ProtectedRoute><Layout><Library /></Layout></ProtectedRoute>} />
             <Route path="*" element={<ProtectedRoute><Layout><NotFound /></Layout></ProtectedRoute>} />
           </Routes>
         </AuthProvider>

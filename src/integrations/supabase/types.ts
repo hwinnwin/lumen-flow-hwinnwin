@@ -121,6 +121,85 @@ export type Database = {
           },
         ]
       }
+      documents: {
+        Row: {
+          category: string | null
+          created_at: string
+          data_description: string | null
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id: string
+          linked_principle_id: string | null
+          linked_project_id: string | null
+          linked_sop_id: string | null
+          summary: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          data_description?: string | null
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id?: string
+          linked_principle_id?: string | null
+          linked_project_id?: string | null
+          linked_sop_id?: string | null
+          summary?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          data_description?: string | null
+          file_name?: string
+          file_size?: number
+          file_type?: string
+          file_url?: string
+          id?: string
+          linked_principle_id?: string | null
+          linked_project_id?: string | null
+          linked_sop_id?: string | null
+          summary?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_linked_principle_id_fkey"
+            columns: ["linked_principle_id"]
+            isOneToOne: false
+            referencedRelation: "principles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_linked_project_id_fkey"
+            columns: ["linked_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_linked_sop_id_fkey"
+            columns: ["linked_sop_id"]
+            isOneToOne: false
+            referencedRelation: "sops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_sources: {
         Row: {
           access_token: string | null

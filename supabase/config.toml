@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.parse-emails]
 verify_jwt = true
+
+[functions.categorize-document]
+verify_jwt = true

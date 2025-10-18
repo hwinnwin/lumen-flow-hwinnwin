@@ -11,7 +11,8 @@ import {
   FileText,
   Star,
   LogOut,
-  Library
+  Library,
+  Sparkles
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,6 +41,7 @@ const navigationItems = [
   { title: "Codex", url: "/codex", icon: BookOpen },
   { title: "Insights", url: "/insights", icon: Lightbulb },
   { title: "Library", url: "/library", icon: Library },
+  { title: "Assistant", url: "/assistant", icon: Sparkles },
 ];
 
 export function AppSidebar() {

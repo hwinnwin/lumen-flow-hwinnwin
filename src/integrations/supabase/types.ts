@@ -572,6 +572,99 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          channel_discord: boolean | null
+          channel_email: boolean | null
+          channel_inapp: boolean | null
+          channel_slack: boolean | null
+          created_at: string | null
+          critical_only: boolean | null
+          digest_daily: boolean | null
+          digest_time: string | null
+          muted_entities: Json | null
+          nudges_enabled: boolean | null
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          channel_discord?: boolean | null
+          channel_email?: boolean | null
+          channel_inapp?: boolean | null
+          channel_slack?: boolean | null
+          created_at?: string | null
+          critical_only?: boolean | null
+          digest_daily?: boolean | null
+          digest_time?: string | null
+          muted_entities?: Json | null
+          nudges_enabled?: boolean | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          channel_discord?: boolean | null
+          channel_email?: boolean | null
+          channel_inapp?: boolean | null
+          channel_slack?: boolean | null
+          created_at?: string | null
+          critical_only?: boolean | null
+          digest_daily?: boolean | null
+          digest_time?: string | null
+          muted_entities?: Json | null
+          nudges_enabled?: boolean | null
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          body: string
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          read_at: string | null
+          severity: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          body: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          severity: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          body?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          severity?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       principles: {
         Row: {
           category: string | null

@@ -13,7 +13,8 @@ import {
   LogOut,
   Library,
   Sparkles,
-  FolderOpen
+  FolderOpen,
+  Bell
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,6 +44,7 @@ const navigationItems = [
   { title: "Codex", url: "/codex", icon: BookOpen },
   { title: "Insights", url: "/insights", icon: Lightbulb },
   { title: "Library", url: "/library", icon: Library },
+  { title: "Notifications", url: "/notifications", icon: Bell },
   { title: "Assistant", url: "/assistant", icon: Sparkles },
 ];
 

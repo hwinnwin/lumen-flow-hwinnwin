@@ -738,12 +738,9 @@ export default function Library() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {doc.summary && (
-                        <div 
-                          className="text-sm text-muted-foreground line-clamp-3"
-                          dangerouslySetInnerHTML={{ 
-                            __html: highlightMatches(doc.summary, filters.query) 
-                          }}
-                        />
+                        <div className="text-sm text-muted-foreground line-clamp-3">
+                          {highlightMatches(doc.summary, filters.query)}
+                        </div>
                       )}
                       
                       {doc.tags && doc.tags.length > 0 && (

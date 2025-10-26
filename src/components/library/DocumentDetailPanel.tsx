@@ -19,7 +19,7 @@ import {
   Trash2,
   ExternalLink,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useUpdateDocument } from "@/hooks/useDocuments";
@@ -33,7 +33,7 @@ interface DocumentDetailPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDelete: (id: string) => void;
-  highlightMatches: (text: string, query: string) => string;
+  highlightMatches: (text: string, query: string) => ReactNode;
   searchQuery: string;
 }
 
@@ -158,10 +158,9 @@ export function DocumentDetailPanel({
           {/* Preview */}
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Preview</h3>
-            <div 
-              className="text-sm text-muted-foreground leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: highlightedExcerpt }}
-            />
+            <div className="text-sm text-muted-foreground leading-relaxed">
+              {highlightedExcerpt}
+            </div>
             {excerpt.length > 300 && <span className="text-xs text-muted-foreground">...</span>}
           </div>
 

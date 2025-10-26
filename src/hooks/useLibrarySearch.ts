@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, ReactNode, createElement } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Document } from './useDocuments';
+
+// Helper to normalize document principle ID access
+const getDocPrincipleId = (doc: Document): string | null => {
+  return doc.primary_principle_id ?? doc.linked_principle_id ?? null;
+};
 
 interface SearchFilters {
   query: string;
@@ -24,7 +29,7 @@ export const useLibrarySearch = (documents: Document[] | undefined) => {
     category: searchParams.get('category') || 'All',
     principleId: searchParams.get('principle') || 'All',
     projectId: searchParams.get('project') || 'All',
-    tags: searchParams.get('tags')?.split(',').filter(Boolean) || [],
+    tags: searchParams.get('tags')?.split(',').map(decodeURIComponent).filter(Boolean) || [],
     dateRange: searchParams.get('range') || 'all',
     sortBy: searchParams.get('sort') || 'relevance',
   }), [searchParams]);
@@ -41,7 +46,7 @@ export const useLibrarySearch = (documents: Document[] | undefined) => {
     
     if (key === 'tags') {
       if (value.length > 0) {
-        newParams.set('tags', value.join(','));
+        newParams.set('tags', value.map(encodeURIComponent).join(','));
       } else {
         newParams.delete('tags');
       }
@@ -54,19 +59,26 @@ export const useLibrarySearch = (documents: Document[] | undefined) => {
     setSearchParams(newParams);
   }, [searchParams, setSearchParams]);
 
-  // Highlight matches in text
-  const highlightMatches = useCallback((text: string, query: string): string => {
+  // Highlight matches in text - returns ReactNode for safe rendering
+  const highlightMatches = useCallback((text: string, query: string): ReactNode => {
     if (!query || !text) return text;
     
-    const terms = query.toLowerCase().split(' ').filter(Boolean);
-    let highlighted = text;
+    const terms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // Escape regex special chars
     
-    terms.forEach(term => {
-      const regex = new RegExp(`(${term})`, 'gi');
-      highlighted = highlighted.replace(regex, '<mark class="bg-primary/20 px-0.5 rounded">$1</mark>');
-    });
+    if (terms.length === 0) return text;
     
-    return highlighted;
+    const regex = new RegExp(`(${terms.join('|')})`, 'gi');
+    const parts = text.split(regex);
+    
+    return parts.map((part, i) =>
+      regex.test(part) 
+        ? createElement('mark', { key: i, className: 'bg-primary/20 px-0.5 rounded' }, part)
+        : createElement('span', { key: i }, part)
+    );
   }, []);
 
   // Filter and score documents
@@ -78,7 +90,7 @@ export const useLibrarySearch = (documents: Document[] | undefined) => {
       if (filters.category !== 'All' && doc.category !== filters.category) return false;
       
       // Principle filter
-      if (filters.principleId !== 'All' && doc.primary_principle_id !== filters.principleId) return false;
+      if (filters.principleId !== 'All' && getDocPrincipleId(doc) !== filters.principleId) return false;
       
       // Project filter  
       if (filters.projectId !== 'All' && doc.linked_project_id !== filters.projectId) return false;

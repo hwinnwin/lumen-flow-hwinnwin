@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-export type TaskStatus = "pending" | "in_progress" | "completed";
-export type TaskPriority = "low" | "medium" | "high";
+export type TaskStatus = "pending" | "in_progress" | "completed" | "blocked" | "deferred";
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export interface Task {
   id: string;
@@ -20,6 +20,11 @@ export interface Task {
   estimated_hours?: number;
   actual_hours?: number;
   sop_id?: string;
+  source?: string;
+  suggestion_id?: string;
+  confidence?: number;
+  completed_at?: string;
+  primary_principle_id?: string;
   created_at: string;
   updated_at: string;
 }

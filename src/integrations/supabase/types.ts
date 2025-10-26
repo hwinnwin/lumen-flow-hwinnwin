@@ -887,11 +887,44 @@ export type Database = {
           },
         ]
       }
+      task_activity: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          meta: Json | null
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          meta?: Json | null
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          meta?: Json | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_activity_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           actual_hours: number | null
           assignee: string | null
           completed_at: string | null
+          confidence: number | null
           created_at: string
           dependencies: string[] | null
           description: string | null
@@ -899,10 +932,13 @@ export type Database = {
           estimated_hours: number | null
           id: string
           parent_task_id: string | null
+          primary_principle_id: string | null
           priority: string | null
           project_id: string
           sop_id: string | null
+          source: string | null
           status: string | null
+          suggestion_id: string | null
           tags: string[] | null
           title: string
           updated_at: string
@@ -911,6 +947,7 @@ export type Database = {
           actual_hours?: number | null
           assignee?: string | null
           completed_at?: string | null
+          confidence?: number | null
           created_at?: string
           dependencies?: string[] | null
           description?: string | null
@@ -918,10 +955,13 @@ export type Database = {
           estimated_hours?: number | null
           id?: string
           parent_task_id?: string | null
+          primary_principle_id?: string | null
           priority?: string | null
           project_id: string
           sop_id?: string | null
+          source?: string | null
           status?: string | null
+          suggestion_id?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
@@ -930,6 +970,7 @@ export type Database = {
           actual_hours?: number | null
           assignee?: string | null
           completed_at?: string | null
+          confidence?: number | null
           created_at?: string
           dependencies?: string[] | null
           description?: string | null
@@ -937,10 +978,13 @@ export type Database = {
           estimated_hours?: number | null
           id?: string
           parent_task_id?: string | null
+          primary_principle_id?: string | null
           priority?: string | null
           project_id?: string
           sop_id?: string | null
+          source?: string | null
           status?: string | null
+          suggestion_id?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string
@@ -951,6 +995,13 @@ export type Database = {
             columns: ["parent_task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_primary_principle_id_fkey"
+            columns: ["primary_principle_id"]
+            isOneToOne: false
+            referencedRelation: "principles"
             referencedColumns: ["id"]
           },
           {

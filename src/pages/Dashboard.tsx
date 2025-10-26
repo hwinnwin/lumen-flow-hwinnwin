@@ -10,7 +10,8 @@ import {
   Clock,
   RefreshCw,
   ArrowRight,
-  Activity
+  Activity,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +21,32 @@ import { useDailyFocus, useGenerateDailyFocus, type TopAction } from "@/hooks/us
 import { SimpleSkeleton } from "@/components/ui/SimpleSkeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data: dailyFocus, isLoading, refetch } = useDailyFocus();
   const generateFocus = useGenerateDailyFocus();
+  const { toast } = useToast();
+  const [deferDialogOpen, setDeferDialogOpen] = useState(false);
+  const [deferReason, setDeferReason] = useState("");
+  const [selectedAction, setSelectedAction] = useState<TopAction | null>(null);
 
   // Auto-generate if no focus exists for today
   useEffect(() => {
@@ -33,6 +54,74 @@ export default function Dashboard() {
       generateFocus.mutate();
     }
   }, [isLoading, dailyFocus]);
+
+  const handleCreateTaskFromAction = async (action: TopAction) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "Error", description: "Please sign in", variant: "destructive" });
+        return;
+      }
+
+      let { data: projects } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      let projectId = projects?.[0]?.id;
+      
+      if (!projectId) {
+        const { data: newProject } = await supabase
+          .from("projects")
+          .insert({ user_id: user.id, name: "Daily Focus Tasks" })
+          .select("id")
+          .single();
+        projectId = newProject?.id;
+      }
+
+      if (!projectId) {
+        toast({ title: "Error", description: "Could not create task", variant: "destructive" });
+        return;
+      }
+
+      const { error } = await supabase.from("tasks").insert({
+        project_id: projectId,
+        title: action.title,
+        description: `Why: ${action.why}\n\nImpact: ${action.impact}`,
+        status: "pending",
+        priority: action.priority || "medium",
+        source: "daily_focus",
+        confidence: 85,
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Task created", description: "Added to your workflow" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleCompleteAction = async (action: TopAction) => {
+    toast({ title: "Action completed", description: `"${action.title}" marked as done` });
+  };
+
+  const handleDeferAction = (action: TopAction) => {
+    setSelectedAction(action);
+    setDeferDialogOpen(true);
+  };
+
+  const confirmDefer = async () => {
+    if (!selectedAction) return;
+    toast({
+      title: "Action deferred",
+      description: `"${selectedAction.title}" — Reason: ${deferReason || "No reason given"}`,
+    });
+    setDeferDialogOpen(false);
+    setDeferReason("");
+    setSelectedAction(null);
+  };
 
   const isLoadingFocus = isLoading || generateFocus.isPending;
 
@@ -118,7 +207,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Hero Section: Today's Focus Theme */}
+      {/* Hero Section */}
       {focusTheme && (
         <Card className="bg-gradient-primary border-primary/20 shadow-elegant">
           <CardContent className="p-8">
@@ -157,7 +246,7 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Top 3 Priority Actions */}
+      {/* Top Actions */}
       {topActions.length > 0 && (
         <div>
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -198,12 +287,33 @@ export default function Dashboard() {
                           </span>
                         </div>
                       )}
-                    </div>
 
-                    <Button className="bg-gradient-primary text-primary-foreground shadow-glow">
-                      {action.quick_action}
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
+                      <div className="flex items-center gap-2 mt-4">
+                        <Button
+                          size="sm"
+                          className="bg-gradient-primary"
+                          onClick={() => handleCreateTaskFromAction(action)}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add to Tasks
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCompleteAction(action)}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Complete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeferAction(action)}
+                        >
+                          Defer
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -212,8 +322,8 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Project Health & Insights Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Project Health */}
         {projectHealth.length > 0 && (
           <Card className="bg-card border-border shadow-card">
             <CardHeader>
@@ -258,12 +368,15 @@ export default function Dashboard() {
                         </Alert>
                       )}
                       <div className="pt-2 border-t border-border">
-                        <span className="text-xs text-muted-foreground">AI Suggests: </span>
-                        <span className="text-xs text-foreground">{project.ai_recommendation}</span>
-                      </div>
-                      <Progress value={project.principle_alignment} className="h-1" />
-                      <div className="text-xs text-muted-foreground">
-                        {project.principle_alignment}% principle alignment
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="w-full"
+                          onClick={() => navigate('/projects')}
+                        >
+                          View Project
+                          <ArrowRight className="w-3 h-3 ml-2" />
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -273,32 +386,29 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Knowledge Insights */}
         {insights.length > 0 && (
           <Card className="bg-card border-border shadow-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="w-5 h-5 text-primary-glow" />
-                Knowledge Insights
+                <Lightbulb className="w-5 h-5 text-primary" />
+                Key Insights
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {insights.map((insight, index) => (
-                  <div key={index} className="p-4 rounded-lg bg-gradient-subtle border border-border">
+                  <div key={index} className="p-4 rounded-lg bg-muted/50 border border-border">
                     <div className="flex items-start gap-3">
-                      <div className="text-2xl">
-                        {insight.type === 'pattern' && '📊'}
-                        {insight.type === 'risk' && '⚠️'}
-                        {insight.type === 'opportunity' && '💡'}
-                        {insight.type === 'connection' && '🔗'}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        insight.type === 'opportunity' ? 'bg-green-500/10 text-green-500' :
+                        insight.type === 'risk' ? 'bg-red-500/10 text-red-500' :
+                        'bg-blue-500/10 text-blue-500'
+                      }`}>
+                        {insight.type === 'opportunity' ? '💡' : insight.type === 'risk' ? '⚠️' : 'ℹ️'}
                       </div>
                       <div className="flex-1">
                         <h4 className="font-semibold text-foreground mb-1">{insight.title}</h4>
-                        <p className="text-sm text-muted-foreground mb-2">{insight.description}</p>
-                        <div className="text-xs text-primary font-medium">
-                          → {insight.action}
-                        </div>
+                        <p className="text-sm text-muted-foreground">{insight.description || ""}</p>
                       </div>
                     </div>
                   </div>
@@ -309,12 +419,12 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Conversation Starters */}
+      {/* Ask AI Assistant */}
       <Card className="bg-gradient-subtle border-border shadow-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            Ask Lumen
+            Ask AI Assistant
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -337,6 +447,38 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Defer Reason Dialog */}
+      <Dialog open={deferDialogOpen} onOpenChange={setDeferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Defer Action</DialogTitle>
+            <DialogDescription>
+              Why are you deferring "{selectedAction?.title}"?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Select value={deferReason} onValueChange={setDeferReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select reason" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="not_today">Not today</SelectItem>
+                <SelectItem value="blocked">Blocked by something</SelectItem>
+                <SelectItem value="needs_info">Needs more info</SelectItem>
+                <SelectItem value="not_aligned">Not aligned with priorities</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDeferDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmDefer}>Defer</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {!dailyFocus && !isLoadingFocus && (
         <Alert>

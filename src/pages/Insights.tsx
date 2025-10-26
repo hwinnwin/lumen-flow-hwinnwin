@@ -143,11 +143,16 @@ export default function Insights() {
 
   // Compute KPIs
   const kpis = useMemo(() => {
+    const prevStartDate = subDays(startDate, rangeInDays);
+    
     const alignedDocs = documents.filter((d: any) => d.primary_principle_id || d.linked_principle_id).length;
     const alignmentPercent = documents.length > 0 ? Math.round((alignedDocs / documents.length) * 100) : 0;
 
     const completedTasks = tasks.filter(
       (t: any) => t.status === "completed" && new Date(t.updated_at) >= startDate
+    ).length;
+    const prevCompletedTasks = tasks.filter(
+      (t: any) => t.status === "completed" && new Date(t.updated_at) >= prevStartDate && new Date(t.updated_at) < startDate
     ).length;
 
     const overdueTasks = tasks.filter(
@@ -159,12 +164,22 @@ export default function Insights() {
       if (p.status === "completed" || p.status === "archived") return false;
       const projectTasks = tasks.filter((t: any) => t.project_id === p.id);
       const incompleteTasks = projectTasks.filter((t: any) => t.status !== "completed").length;
+      const avgConfidence = projectTasks.length > 0 
+        ? projectTasks.reduce((sum: number, t: any) => sum + (t.confidence || 0), 0) / projectTasks.length
+        : 100;
       const isNearDeadline = p.deadline && new Date(p.deadline) < subDays(new Date(), -7);
-      return isNearDeadline && incompleteTasks > 3;
+      return (isNearDeadline && incompleteTasks > 3) || avgConfidence < 60;
     }).length;
 
-    return { alignmentPercent, completedTasks, overdueTasks, activeProjects, atRiskProjects };
-  }, [documents, tasks, projects, startDate]);
+    return { 
+      alignmentPercent, 
+      completedTasks, 
+      completedDelta: prevCompletedTasks > 0 ? Math.round(((completedTasks - prevCompletedTasks) / prevCompletedTasks) * 100) : 0,
+      overdueTasks, 
+      activeProjects, 
+      atRiskProjects 
+    };
+  }, [documents, tasks, projects, startDate, rangeInDays]);
 
   // Principle Alignment Over Time
   const alignmentOverTime = useMemo(() => {
@@ -190,28 +205,32 @@ export default function Insights() {
 
   // Productivity Patterns
   const productivityPatterns = useMemo(() => {
-    const byWeekday = Array(7).fill(0);
-    const bySource = { manual: 0, assistant: 0, daily_focus: 0 };
+    const byWeekday = Array(7).fill(0).map(() => ({ manual: 0, assistant: 0, daily_focus: 0 }));
+    const cycleTimes: number[] = [];
     
-    tasks.filter((t: any) => t.status === "completed").forEach((t: any) => {
+    tasks.filter((t: any) => t.status === "completed" && new Date(t.updated_at) >= startDate).forEach((t: any) => {
       const day = new Date(t.completed_at || t.updated_at).getDay();
-      byWeekday[day]++;
       const source = (t as any).source || "manual";
-      if (source in bySource) bySource[source as keyof typeof bySource]++;
+      if (source in byWeekday[day]) byWeekday[day][source as keyof typeof byWeekday[0]]++;
+      
+      if (t.completed_at && t.created_at) {
+        const cycleMs = new Date(t.completed_at).getTime() - new Date(t.created_at).getTime();
+        cycleTimes.push(cycleMs / (1000 * 60 * 60)); // hours
+      }
     });
 
     const weekdayData = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => ({
       day,
-      completed: byWeekday[i],
+      Manual: byWeekday[i].manual,
+      Assistant: byWeekday[i].assistant,
+      "Daily Focus": byWeekday[i].daily_focus,
     }));
 
-    const sourceData = Object.entries(bySource).map(([source, count]) => ({
-      source: source.charAt(0).toUpperCase() + source.slice(1),
-      count,
-    }));
+    cycleTimes.sort((a, b) => a - b);
+    const medianCycle = cycleTimes.length > 0 ? cycleTimes[Math.floor(cycleTimes.length / 2)] : 0;
 
-    return { weekdayData, sourceData };
-  }, [tasks]);
+    return { weekdayData, medianCycle };
+  }, [tasks, startDate]);
 
   // Project Health
   const projectHealth = useMemo(() => {
@@ -268,7 +287,9 @@ export default function Insights() {
         return { project: p.name, sopCount, docCount };
       });
 
-    return { principleGaps, projectGaps };
+    const unalignedDocs = documents.filter((d: any) => !d.primary_principle_id && !d.linked_principle_id).length;
+
+    return { principleGaps, projectGaps, unalignedDocs };
   }, [principles, projects, documents, sops]);
 
   // Weekly Summary
@@ -353,7 +374,14 @@ export default function Insights() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{kpis.completedTasks}</div>
-                  <div className="text-xs text-muted-foreground">Tasks Done</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    Tasks Done
+                    {kpis.completedDelta !== 0 && (
+                      <span className={kpis.completedDelta > 0 ? "text-green-500" : "text-red-500"}>
+                        {kpis.completedDelta > 0 ? "+" : ""}{kpis.completedDelta}%
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -440,10 +468,10 @@ export default function Insights() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" />
-              Tasks Completed by Weekday
+              Productivity Patterns
             </CardTitle>
             <CardDescription className="text-xs">
-              Your most productive days
+              Tasks by weekday and source • Median cycle: {productivityPatterns.medianCycle.toFixed(1)}h
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -453,12 +481,117 @@ export default function Insights() {
                 <XAxis dataKey="day" className="text-xs" />
                 <YAxis className="text-xs" />
                 <Tooltip />
-                <Bar dataKey="completed" fill="hsl(var(--primary))" name="Completed Tasks" />
+                <Legend />
+                <Bar dataKey="Manual" stackId="a" fill="hsl(var(--primary))" />
+                <Bar dataKey="Assistant" stackId="a" fill="hsl(var(--chart-2))" />
+                <Bar dataKey="Daily Focus" stackId="a" fill="hsl(var(--chart-3))" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
+
+      {/* Project Health */}
+      <Card className="rounded-2xl shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Activity className="w-5 h-5 text-primary" />
+            Project Health
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Active projects with risk indicators
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Project</TableHead>
+                <TableHead>Deadline</TableHead>
+                <TableHead>Throughput</TableHead>
+                <TableHead>Confidence</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {projectHealth.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No active projects
+                  </TableCell>
+                </TableRow>
+              ) : (
+                projectHealth.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell>
+                      {p.daysToDeadline !== null ? (
+                        <span className={p.daysToDeadline < 7 ? "text-red-500" : ""}>
+                          {p.daysToDeadline}d
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{p.throughput} last 14d</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${confidenceColor(p.avgConfidence)}`} />
+                        {p.avgConfidence}%
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {p.atRisk && (
+                        <Badge variant="destructive" className="text-xs">At Risk</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Knowledge Gaps */}
+      <Card className="rounded-2xl shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lightbulb className="w-5 h-5 text-primary" />
+            Knowledge Gaps
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Areas needing documentation or alignment
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="text-sm font-medium mb-2">Principles with Low Doc Support</h4>
+            {knowledgeGaps.principleGaps.slice(0, 5).map((pg) => (
+              <div key={pg.principle} className="flex items-center justify-between py-1">
+                <span className="text-sm">{pg.principle}</span>
+                <Badge variant="outline" className="text-xs">{pg.docCount} docs</Badge>
+              </div>
+            ))}
+          </div>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Projects Missing SOPs</h4>
+            {knowledgeGaps.projectGaps.filter((pg) => pg.sopCount === 0).slice(0, 5).map((pg) => (
+              <div key={pg.project} className="flex items-center justify-between py-1">
+                <span className="text-sm">{pg.project}</span>
+                <Badge variant="outline" className="text-xs">{pg.docCount} docs</Badge>
+              </div>
+            ))}
+          </div>
+          {knowledgeGaps.unalignedDocs > 0 && (
+            <div className="pt-2 border-t">
+              <p className="text-sm text-muted-foreground">
+                <strong>{knowledgeGaps.unalignedDocs}</strong> documents without principle alignment
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* What I Learned This Week */}
       <Card className="rounded-2xl shadow-sm bg-gradient-primary/5 border-primary/20">

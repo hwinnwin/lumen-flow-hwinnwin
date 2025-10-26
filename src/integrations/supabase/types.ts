@@ -506,7 +506,7 @@ export type Database = {
           id: string
           ignored: boolean | null
           priority_level: string
-          time_to_complete: unknown | null
+          time_to_complete: unknown
           title: string
           user_id: string
         }
@@ -518,7 +518,7 @@ export type Database = {
           id?: string
           ignored?: boolean | null
           priority_level: string
-          time_to_complete?: unknown | null
+          time_to_complete?: unknown
           title: string
           user_id: string
         }
@@ -530,7 +530,7 @@ export type Database = {
           id?: string
           ignored?: boolean | null
           priority_level?: string
-          time_to_complete?: unknown | null
+          time_to_complete?: unknown
           title?: string
           user_id?: string
         }
@@ -580,7 +580,9 @@ export type Database = {
           description: string | null
           id: string
           priority: string | null
+          tags: string[] | null
           title: string
+          type: string | null
           updated_at: string
           user_id: string
         }
@@ -591,7 +593,9 @@ export type Database = {
           description?: string | null
           id?: string
           priority?: string | null
+          tags?: string[] | null
           title: string
+          type?: string | null
           updated_at?: string
           user_id: string
         }
@@ -602,7 +606,9 @@ export type Database = {
           description?: string | null
           id?: string
           priority?: string | null
+          tags?: string[] | null
           title?: string
+          type?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -758,6 +764,7 @@ export type Database = {
           icon: string | null
           id: string
           name: string
+          primary_principle_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -768,6 +775,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
+          primary_principle_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -778,10 +786,19 @@ export type Database = {
           icon?: string | null
           id?: string
           name?: string
+          primary_principle_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_primary_principle_id_fkey"
+            columns: ["primary_principle_id"]
+            isOneToOne: false
+            referencedRelation: "principles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sops: {
         Row: {
@@ -790,6 +807,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          linked_principle_id: string | null
           status: string | null
           tags: string[] | null
           title: string
@@ -803,6 +821,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          linked_principle_id?: string | null
           status?: string | null
           tags?: string[] | null
           title: string
@@ -816,6 +835,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          linked_principle_id?: string | null
           status?: string | null
           tags?: string[] | null
           title?: string
@@ -823,7 +843,15 @@ export type Database = {
           user_id?: string
           version?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sops_linked_principle_id_fkey"
+            columns: ["linked_principle_id"]
+            isOneToOne: false
+            referencedRelation: "principles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {

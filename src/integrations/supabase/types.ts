@@ -1146,6 +1146,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_similar_notification: {
+        Args: {
+          p_entity: string
+          p_type: string
+          p_user_id: string
+          p_window_hours?: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "viewer"

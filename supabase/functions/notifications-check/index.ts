@@ -41,18 +41,19 @@ async function checkDuplicate(
   entityId: string | null,
   hours: number
 ): Promise<boolean> {
-  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+  const { data, error } = await supabase.rpc('has_similar_notification', {
+    p_user_id: userId,
+    p_type: type,
+    p_entity: entityId,
+    p_window_hours: hours
+  });
   
-  const { data } = await supabase
-    .from('notifications')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('type', type)
-    .eq('entity_id', entityId)
-    .gte('created_at', cutoff.toISOString())
-    .limit(1);
+  if (error) {
+    console.error('Error checking duplicate:', error);
+    return false;
+  }
   
-  return (data?.length ?? 0) > 0;
+  return data === true;
 }
 
 async function createNotification(

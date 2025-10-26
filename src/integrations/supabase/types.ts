@@ -821,9 +821,13 @@ export type Database = {
           content: string
           created_at: string
           description: string | null
+          frequency: string | null
           id: string
           linked_principle_id: string | null
+          owner: string | null
+          project_id: string | null
           status: string | null
+          steps: Json | null
           tags: string[] | null
           title: string
           updated_at: string
@@ -835,9 +839,13 @@ export type Database = {
           content: string
           created_at?: string
           description?: string | null
+          frequency?: string | null
           id?: string
           linked_principle_id?: string | null
+          owner?: string | null
+          project_id?: string | null
           status?: string | null
+          steps?: Json | null
           tags?: string[] | null
           title: string
           updated_at?: string
@@ -849,9 +857,13 @@ export type Database = {
           content?: string
           created_at?: string
           description?: string | null
+          frequency?: string | null
           id?: string
           linked_principle_id?: string | null
+          owner?: string | null
+          project_id?: string | null
           status?: string | null
+          steps?: Json | null
           tags?: string[] | null
           title?: string
           updated_at?: string
@@ -864,6 +876,13 @@ export type Database = {
             columns: ["linked_principle_id"]
             isOneToOne: false
             referencedRelation: "principles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sops_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]

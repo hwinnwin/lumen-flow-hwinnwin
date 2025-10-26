@@ -73,5 +73,34 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Safe area for iOS notch */
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Touch-friendly minimum sizes */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text size adjustment on mobile */
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Smooth scrolling with momentum on iOS */
+  html, body {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

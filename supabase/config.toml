@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.generate-daily-focus]
 verify_jwt = true
+
+[functions.notifications-check]
+verify_jwt = false

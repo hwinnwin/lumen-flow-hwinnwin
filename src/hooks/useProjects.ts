@@ -10,6 +10,11 @@ export type Project = {
   color?: string;
   icon?: string;
   primary_principle_id?: string;
+  status?: string;
+  priority?: string;
+  tags?: string[];
+  deadline?: string;
+  category?: string;
   created_at: string;
   updated_at: string;
 };

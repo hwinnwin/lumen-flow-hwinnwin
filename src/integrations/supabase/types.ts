@@ -758,35 +758,50 @@ export type Database = {
       }
       projects: {
         Row: {
+          category: string | null
           color: string | null
           created_at: string | null
+          deadline: string | null
           description: string | null
           icon: string | null
           id: string
           name: string
           primary_principle_id: string | null
+          priority: string | null
+          status: string | null
+          tags: string[] | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          category?: string | null
           color?: string | null
           created_at?: string | null
+          deadline?: string | null
           description?: string | null
           icon?: string | null
           id?: string
           name: string
           primary_principle_id?: string | null
+          priority?: string | null
+          status?: string | null
+          tags?: string[] | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          category?: string | null
           color?: string | null
           created_at?: string | null
+          deadline?: string | null
           description?: string | null
           icon?: string | null
           id?: string
           name?: string
           primary_principle_id?: string | null
+          priority?: string | null
+          status?: string | null
+          tags?: string[] | null
           updated_at?: string | null
           user_id?: string
         }

@@ -11,6 +11,7 @@ import Inbox from "./pages/Inbox";
 import Workflow from "./pages/Workflow";
 import SOPs from "./pages/SOPs";
 import Principles from "./pages/Principles";
+import Projects from "./pages/Projects";
 import Codex from "./pages/Codex";
 import Insights from "./pages/Insights";
 import Library from "./pages/Library";
@@ -33,9 +34,10 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
             <Route path="/inbox" element={<ProtectedRoute><Layout><Inbox /></Layout></ProtectedRoute>} />
             <Route path="/workflow" element={<ProtectedRoute><Layout><Workflow /></Layout></ProtectedRoute>} />
-            <Route path="/sops" element={<ProtectedRoute><Layout><SOPs /></Layout></ProtectedRoute>} />
-            <Route path="/principles" element={<ProtectedRoute><Layout><Principles /></Layout></ProtectedRoute>} />
-            <Route path="/codex" element={<ProtectedRoute><Layout><Codex /></Layout></ProtectedRoute>} />
+              <Route path="/sops" element={<ProtectedRoute><Layout><SOPs /></Layout></ProtectedRoute>} />
+              <Route path="/principles" element={<ProtectedRoute><Layout><Principles /></Layout></ProtectedRoute>} />
+              <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
+              <Route path="/codex" element={<ProtectedRoute><Layout><Codex /></Layout></ProtectedRoute>} />
             <Route path="/insights" element={<ProtectedRoute><Layout><Insights /></Layout></ProtectedRoute>} />
             <Route path="/library" element={<ProtectedRoute><Layout><Library /></Layout></ProtectedRoute>} />
             <Route path="/assistant" element={<ProtectedRoute><Layout><Assistant /></Layout></ProtectedRoute>} />

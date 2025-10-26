@@ -12,7 +12,8 @@ import {
   Star,
   LogOut,
   Library,
-  Sparkles
+  Sparkles,
+  FolderOpen
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +39,7 @@ const navigationItems = [
   { title: "Workflow", url: "/workflow", icon: Workflow },
   { title: "SOPs", url: "/sops", icon: FileText },
   { title: "Principles", url: "/principles", icon: Star },
+  { title: "Projects", url: "/projects", icon: FolderOpen },
   { title: "Codex", url: "/codex", icon: BookOpen },
   { title: "Insights", url: "/insights", icon: Lightbulb },
   { title: "Library", url: "/library", icon: Library },

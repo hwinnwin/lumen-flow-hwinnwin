@@ -1,330 +1,483 @@
-import { useState } from "react";
-import { Lightbulb, Search, Plus, Calendar, Tag, Edit, Trash2, Heart } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import React, { useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/hooks/use-toast";
-import { useInsights, useCreateInsight, useUpdateInsight, useDeleteInsight } from "@/hooks/useInsights";
-import { SimpleSkeleton } from "@/components/ui/SimpleSkeleton";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  TrendingUp,
+  CheckCircle2,
+  AlertCircle,
+  Target,
+  FileText,
+  BookOpen,
+  Calendar,
+  Copy,
+  Send,
+  BarChart3,
+  PieChart,
+  Activity,
+  Lightbulb,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { format, subDays, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 
-const categories = ["All", "Business", "Management", "Product", "Personal"];
+type DateRange = "7" | "14" | "30";
+
+// Confidence color helper
+function confidenceColor(score?: number) {
+  if (!score) return "bg-gray-400";
+  if (score >= 80) return "bg-green-500";
+  if (score >= 60) return "bg-yellow-500";
+  if (score >= 40) return "bg-orange-500";
+  return "bg-red-500";
+}
 
 export default function Insights() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newInsight, setNewInsight] = useState({ 
-    title: "", 
-    content: "", 
-    category: "Personal", 
-    tags: [] as string[],
-    is_favorite: false 
+  const [dateRange, setDateRange] = useState<DateRange>("7");
+  const { toast } = useToast();
+
+  const rangeInDays = parseInt(dateRange);
+  const startDate = useMemo(() => subDays(new Date(), rangeInDays), [rangeInDays]);
+
+  // Fetch all data
+  const { data: documents = [] } = useQuery({
+    queryKey: ["documents-insights"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("user_id", user.id);
+      return data || [];
+    },
   });
 
-  const { data: insights = [], isLoading } = useInsights();
-  const createInsight = useCreateInsight();
-  const updateInsight = useUpdateInsight();
-  const deleteInsight = useDeleteInsight();
-
-  const filteredInsights = insights.filter(insight => {
-    const matchesSearch = insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         insight.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (insight.tags && insight.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
-    const matchesCategory = selectedCategory === "All" || insight.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+  const { data: principles = [] } = useQuery({
+    queryKey: ["principles-insights"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data } = await supabase
+        .from("principles")
+        .select("*")
+        .eq("user_id", user.id);
+      return data || [];
+    },
   });
 
-  const toggleFavorite = (id: string) => {
-    const insight = insights.find(i => i.id === id);
-    if (insight) {
-      updateInsight.mutate({ id, is_favorite: !insight.is_favorite });
-    }
-  };
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects-insights"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("user_id", user.id);
+      return data || [];
+    },
+  });
 
-  const handleDelete = (id: string) => {
-    deleteInsight.mutate(id);
-  };
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks-insights"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data } = await supabase
+        .from("tasks")
+        .select("*")
+        .gte("created_at", startDate.toISOString());
+      return data || [];
+    },
+  });
 
-  const handleCreate = () => {
-    if (!newInsight.title || !newInsight.content) {
-      toast({
-        title: "Error",
-        description: "Title and content are required",
-        variant: "destructive",
+  const { data: sops = [] } = useQuery({
+    queryKey: ["sops-insights"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data } = await supabase
+        .from("sops")
+        .select("*")
+        .eq("user_id", user.id);
+      return data || [];
+    },
+  });
+
+  // Compute KPIs
+  const kpis = useMemo(() => {
+    const alignedDocs = documents.filter((d: any) => d.primary_principle_id || d.linked_principle_id).length;
+    const alignmentPercent = documents.length > 0 ? Math.round((alignedDocs / documents.length) * 100) : 0;
+
+    const completedTasks = tasks.filter(
+      (t: any) => t.status === "completed" && new Date(t.updated_at) >= startDate
+    ).length;
+
+    const overdueTasks = tasks.filter(
+      (t: any) => t.due_date && new Date(t.due_date) < new Date() && t.status !== "completed"
+    ).length;
+
+    const activeProjects = projects.filter((p: any) => p.status !== "completed" && p.status !== "archived").length;
+    const atRiskProjects = projects.filter((p: any) => {
+      if (p.status === "completed" || p.status === "archived") return false;
+      const projectTasks = tasks.filter((t: any) => t.project_id === p.id);
+      const incompleteTasks = projectTasks.filter((t: any) => t.status !== "completed").length;
+      const isNearDeadline = p.deadline && new Date(p.deadline) < subDays(new Date(), -7);
+      return isNearDeadline && incompleteTasks > 3;
+    }).length;
+
+    return { alignmentPercent, completedTasks, overdueTasks, activeProjects, atRiskProjects };
+  }, [documents, tasks, projects, startDate]);
+
+  // Principle Alignment Over Time
+  const alignmentOverTime = useMemo(() => {
+    const weeks = Math.ceil(rangeInDays / 7);
+    const data = [];
+    for (let i = 0; i < weeks; i++) {
+      const weekStart = subDays(new Date(), (weeks - i) * 7);
+      const weekEnd = subDays(new Date(), (weeks - i - 1) * 7);
+      const weekDocs = documents.filter((d: any) => {
+        const created = new Date(d.created_at);
+        return created >= weekStart && created <= weekEnd;
       });
-      return;
+      const alignedCount = weekDocs.filter((d: any) => d.primary_principle_id || d.linked_principle_id).length;
+      const overrideCount = weekDocs.filter((d: any) => d.user_override).length;
+      data.push({
+        week: `Week ${i + 1}`,
+        alignment: weekDocs.length > 0 ? Math.round((alignedCount / weekDocs.length) * 100) : 0,
+        overrides: overrideCount,
+      });
     }
-    createInsight.mutate(newInsight);
-    setNewInsight({ title: "", content: "", category: "Personal", tags: [], is_favorite: false });
-    setIsCreating(false);
-  };
+    return data;
+  }, [documents, rangeInDays]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // Productivity Patterns
+  const productivityPatterns = useMemo(() => {
+    const byWeekday = Array(7).fill(0);
+    const bySource = { manual: 0, assistant: 0, daily_focus: 0 };
+    
+    tasks.filter((t: any) => t.status === "completed").forEach((t: any) => {
+      const day = new Date(t.completed_at || t.updated_at).getDay();
+      byWeekday[day]++;
+      const source = (t as any).source || "manual";
+      if (source in bySource) bySource[source as keyof typeof bySource]++;
     });
-  };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <SimpleSkeleton className="h-32 w-full" />
-        <SimpleSkeleton className="h-64 w-full" />
-      </div>
+    const weekdayData = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => ({
+      day,
+      completed: byWeekday[i],
+    }));
+
+    const sourceData = Object.entries(bySource).map(([source, count]) => ({
+      source: source.charAt(0).toUpperCase() + source.slice(1),
+      count,
+    }));
+
+    return { weekdayData, sourceData };
+  }, [tasks]);
+
+  // Project Health
+  const projectHealth = useMemo(() => {
+    return projects
+      .filter((p: any) => p.status !== "completed" && p.status !== "archived")
+      .map((p: any) => {
+        const projectTasks = tasks.filter((t: any) => t.project_id === p.id);
+        const completed = projectTasks.filter((t: any) => t.status === "completed").length;
+        const total = projectTasks.length;
+        const throughput = projectTasks.filter(
+          (t: any) => t.status === "completed" && new Date(t.completed_at || t.updated_at) >= subDays(new Date(), 14)
+        ).length;
+        
+        const projectDocs = documents.filter((d: any) => d.linked_project_id === p.id);
+        const avgConfidence =
+          projectDocs.length > 0
+            ? Math.round(
+                projectDocs.reduce((sum: number, d: any) => sum + (d.principle_alignment_score || 0), 0) /
+                  projectDocs.length
+              )
+            : 0;
+
+        const daysToDeadline = p.deadline
+          ? Math.ceil((new Date(p.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        const atRisk =
+          (daysToDeadline !== null && daysToDeadline < 7 && total - completed > 3) || avgConfidence < 60;
+
+        return {
+          id: p.id,
+          name: p.name,
+          daysToDeadline,
+          throughput,
+          avgConfidence,
+          atRisk,
+        };
+      });
+  }, [projects, tasks, documents]);
+
+  // Knowledge Gaps
+  const knowledgeGaps = useMemo(() => {
+    const principleGaps = principles.map((p: any) => {
+      const docCount = documents.filter((d: any) => d.primary_principle_id === p.id || d.linked_principle_id === p.id)
+        .length;
+      return { principle: p.title, docCount };
+    });
+
+    const projectGaps = projects
+      .filter((p: any) => p.status !== "completed" && p.status !== "archived")
+      .map((p: any) => {
+        const sopCount = sops.filter((s: any) => s.project_id === p.id).length;
+        const docCount = documents.filter((d: any) => d.linked_project_id === p.id).length;
+        return { project: p.name, sopCount, docCount };
+      });
+
+    return { principleGaps, projectGaps };
+  }, [principles, projects, documents, sops]);
+
+  // Weekly Summary
+  const weeklySummary = useMemo(() => {
+    const weekStart = startOfWeek(new Date());
+    const weekEnd = endOfWeek(new Date());
+    
+    const weekDocs = documents.filter((d: any) =>
+      isWithinInterval(new Date(d.created_at), { start: weekStart, end: weekEnd })
     );
-  }
+    
+    const weekTasks = tasks.filter(
+      (t: any) =>
+        t.status === "completed" &&
+        isWithinInterval(new Date(t.completed_at || t.updated_at), { start: weekStart, end: weekEnd })
+    );
+
+    const topDoc = weekDocs.sort((a: any, b: any) => (b.principle_alignment_score || 0) - (a.principle_alignment_score || 0))[0];
+    const overrides = weekDocs.filter((d: any) => d.user_override).length;
+
+    return `This week, you completed ${weekTasks.length} tasks${
+      topDoc ? ` and aligned "${topDoc.title}" with confidence ${topDoc.principle_alignment_score}%` : ""
+    }. ${
+      overrides > 0 ? `You made ${overrides} manual alignment corrections, showing refined judgment.` : "Great alignment consistency!"
+    }`;
+  }, [documents, tasks]);
+
+  const handleCopySummary = () => {
+    navigator.clipboard.writeText(weeklySummary);
+    toast({ title: "Copied to clipboard" });
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen p-8 bg-gradient-subtle space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent">
-            Insights
+          <h1 className="text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent flex items-center gap-2">
+            <BarChart3 className="w-8 h-8 text-primary" />
+            Smart Insights
           </h1>
           <p className="text-muted-foreground mt-1">
-            Your personal knowledge journal and insight collection
+            Analytics across principles, projects, and productivity
           </p>
         </div>
-        <Button 
-          className="bg-gradient-primary text-primary-foreground shadow-royal"
-          onClick={() => setIsCreating(!isCreating)}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Insight
-        </Button>
+        <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+          <SelectTrigger className="w-[200px] rounded-xl">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">Last 7 Days</SelectItem>
+            <SelectItem value="14">Last 14 Days</SelectItem>
+            <SelectItem value="30">Last 30 Days</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search insights, tags, or content..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-input border-border"
-          />
-        </div>
-        
-        <div className="flex gap-2">
-          {categories.map((category) => (
-            <Button
-              key={category}
-              variant={selectedCategory === category ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedCategory(category)}
-              className={selectedCategory === category ? "bg-gradient-primary text-primary-foreground" : ""}
-            >
-              {category}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{insights.length}</p>
-                <p className="text-sm text-muted-foreground">Total Insights</p>
+      {/* Top KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{kpis.alignmentPercent}%</div>
+                  <div className="text-xs text-muted-foreground">Alignment</div>
+                </div>
               </div>
-              <Lightbulb className="w-6 h-6 text-primary-glow" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {insights.filter(i => i.is_favorite).length}
-                </p>
-                <p className="text-sm text-muted-foreground">Favorites</p>
-              </div>
-              <Heart className="w-6 h-6 text-accent" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{categories.length - 1}</p>
-                <p className="text-sm text-muted-foreground">Categories</p>
-              </div>
-              <Tag className="w-6 h-6 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-subtle border-border shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {insights.filter(i => {
-                    const weekAgo = new Date();
-                    weekAgo.setDate(weekAgo.getDate() - 7);
-                    return new Date(i.created_at) > weekAgo;
-                  }).length}
-                </p>
-                <p className="text-sm text-muted-foreground">This Week</p>
-              </div>
-              <Calendar className="w-6 h-6 text-primary-glow" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Create New Insight Form */}
-      {isCreating && (
-        <Card className="animate-fade-in border-primary/20">
-          <CardHeader>
-            <CardTitle>Create New Insight</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Title"
-              value={newInsight.title}
-              onChange={(e) => setNewInsight({ ...newInsight, title: e.target.value })}
-            />
-            <Textarea
-              placeholder="Content"
-              value={newInsight.content}
-              onChange={(e) => setNewInsight({ ...newInsight, content: e.target.value })}
-              rows={4}
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleCreate}>Save Insight</Button>
-              <Button variant="outline" onClick={() => setIsCreating(false)}>Cancel</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Insights List */}
-      <div className="space-y-4">
-        {filteredInsights.length === 0 ? (
-          <Card className="bg-card border-border shadow-card">
-            <CardContent className="p-12 text-center">
-              <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No insights found</h3>
-              <p className="text-muted-foreground">Try adjusting your search or create your first insight</p>
             </CardContent>
           </Card>
-        ) : (
-          filteredInsights.map((insight) => (
-            <Card key={insight.id} className="bg-card border-border shadow-card hover:shadow-glow transition-royal">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      {insight.category && <Badge variant="secondary">{insight.category}</Badge>}
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        {formatDate(insight.created_at)}
-                      </div>
-                      {insight.updated_at !== insight.created_at && (
-                        <span className="text-xs text-muted-foreground">
-                          (edited {formatDate(insight.updated_at)})
-                        </span>
-                      )}
-                    </div>
-                    
-                    {editingId === insight.id ? (
-                      <Input
-                        defaultValue={insight.title}
-                        onBlur={(e) => {
-                          updateInsight.mutate({ id: insight.id, title: e.target.value });
-                          setEditingId(null);
-                        }}
-                        className="text-xl font-semibold mb-2 bg-input border-border"
-                        autoFocus
-                      />
-                    ) : (
-                      <CardTitle className="text-xl text-foreground mb-2">
-                        {insight.title}
-                      </CardTitle>
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleFavorite(insight.id)}
-                      className="p-2"
-                    >
-                      <Heart 
-                        className={`w-4 h-4 ${
-                          insight.is_favorite ? 'fill-accent text-accent' : 'text-muted-foreground'
-                        }`} 
-                      />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditingId(editingId === insight.id ? null : insight.id)}
-                      className="p-2"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-2 text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(insight.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-blue-500" />
                 </div>
-              </CardHeader>
-              
-              <CardContent>
-                {editingId === insight.id ? (
-                  <Textarea
-                    defaultValue={insight.content}
-                    onBlur={(e) => {
-                      updateInsight.mutate({ id: insight.id, content: e.target.value });
-                      setEditingId(null);
-                    }}
-                    className="min-h-[200px] mb-4 bg-input border-border"
-                  />
-                ) : (
-                  <div className="prose prose-sm max-w-none mb-4">
-                    <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
-                      {insight.content}
-                    </p>
-                  </div>
-                )}
-                
-                {insight.tags && insight.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {insight.tags.map((tag) => (
-                      <Badge key={tag} variant="outline" className="text-xs">
-                        <Tag className="w-3 h-3 mr-1" />
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
-        )}
+                <div>
+                  <div className="text-2xl font-bold">{kpis.completedTasks}</div>
+                  <div className="text-xs text-muted-foreground">Tasks Done</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{kpis.overdueTasks}</div>
+                  <div className="text-xs text-muted-foreground">Overdue</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{kpis.activeProjects}</div>
+                  <div className="text-xs text-muted-foreground">Active Projects</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card className="rounded-2xl shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{kpis.atRiskProjects}</div>
+                  <div className="text-xs text-muted-foreground">At Risk</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
+
+      {/* Principle Alignment Over Time */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Principle Alignment Over Time
+            </CardTitle>
+            <CardDescription className="text-xs">
+              % of documents aligned to principles per week
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={alignmentOverTime}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="week" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="alignment" stroke="hsl(var(--primary))" strokeWidth={2} name="Alignment %" />
+                <Line type="monotone" dataKey="overrides" stroke="hsl(var(--destructive))" strokeWidth={2} name="Overrides" />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              Tasks Completed by Weekday
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Your most productive days
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={productivityPatterns.weekdayData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="day" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip />
+                <Bar dataKey="completed" fill="hsl(var(--primary))" name="Completed Tasks" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* What I Learned This Week */}
+      <Card className="rounded-2xl shadow-sm bg-gradient-primary/5 border-primary/20">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-primary" />
+            What I Learned This Week
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm leading-relaxed mb-4">{weeklySummary}</p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleCopySummary}>
+              <Copy className="w-4 h-4 mr-2" />
+              Copy
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

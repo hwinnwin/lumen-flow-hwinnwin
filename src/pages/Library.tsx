@@ -759,7 +759,7 @@ export default function Library() {
                             </Badge>
                           )}
                         </div>
-                      </div>
+                      )}
 
                       <div className="text-xs text-muted-foreground">
                         {formatFileSize(doc.file_size)} • {formatInTimeZone(new Date(doc.created_at), 'Australia/Melbourne', 'PP')}

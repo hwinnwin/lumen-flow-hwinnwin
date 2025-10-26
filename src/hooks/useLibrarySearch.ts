@@ -31,8 +31,8 @@ export const useLibrarySearch = (documents: Document[] | undefined) => {
 
   // Detect semantic mode on mount
   useEffect(() => {
-    // For now, default to keyword mode (no embeddings table exists)
-    // In a production setup with embeddings, you would check for document_chunks table
+    // Default to keyword mode (document_chunks table not yet created)
+    // When embeddings are added, this will auto-detect the table
     setSemanticMode(false);
   }, []);
 
@@ -72,8 +72,6 @@ export const useLibrarySearch = (documents: Document[] | undefined) => {
   // Filter and score documents
   const filteredDocuments = useMemo(() => {
     if (!documents) return [];
-    
-    setIsSearching(true);
     
     let results = documents.filter(doc => {
       // Category filter
@@ -169,9 +167,15 @@ export const useLibrarySearch = (documents: Document[] | undefined) => {
       }
     });
 
-    setIsSearching(false);
     return results;
   }, [documents, filters]);
+
+  // Track search state separately
+  useEffect(() => {
+    setIsSearching(true);
+    const t = setTimeout(() => setIsSearching(false), 120);
+    return () => clearTimeout(t);
+  }, [filters, documents?.length]);
 
   return {
     filters,

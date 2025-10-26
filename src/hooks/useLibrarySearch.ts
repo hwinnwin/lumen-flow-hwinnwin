@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Document } from './useDocuments';
 
 // Helper to normalize document principle ID access
-const getDocPrincipleId = (doc: Document): string | null => {
+export const getDocPrincipleId = (doc: Document): string | null => {
   return doc.primary_principle_id ?? doc.linked_principle_id ?? null;
 };
 

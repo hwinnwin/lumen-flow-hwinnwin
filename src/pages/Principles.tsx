@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { Plus, Lightbulb, Edit, Trash2, Star, Layers, FileText, FolderOpen, BookOpen, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
+import { Plus, Lightbulb, Edit, Trash2, Star, Layers, FileText, FolderOpen, BookOpen, TrendingUp, CheckCircle2, AlertCircle, Search, Filter, Link2, Target, Gauge, Sparkles, MoreHorizontal, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -38,6 +44,9 @@ export default function Principles() {
   const [editingPrinciple, setEditingPrinciple] = useState<Principle | null>(null);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [onlyCore, setOnlyCore] = useState(false);
+  const [onlyAspirational, setOnlyAspirational] = useState(false);
   const [alignmentStats, setAlignmentStats] = useState<Record<string, AlignmentStats>>({});
   const { toast } = useToast();
 
@@ -263,9 +272,23 @@ export default function Principles() {
     });
   };
 
-  const filteredPrinciples = principles
-    .filter(p => filterPriority === "all" || p.priority === filterPriority)
-    .filter(p => filterType === "all" || p.type === filterType);
+  const filteredPrinciples = useMemo(() => {
+    return principles.filter((p) => {
+      const matchesQuery =
+        !searchQuery.trim() ||
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (p.content && p.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        p.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesPriority = filterPriority === "all" || p.priority === filterPriority;
+      const matchesType = filterType === "all" || p.type === filterType;
+      const matchesCore = !onlyCore || p.type === 'core';
+      const matchesAspirational = !onlyAspirational || p.type === 'aspirational';
+      
+      return matchesQuery && matchesPriority && matchesType && matchesCore && matchesAspirational;
+    });
+  }, [principles, searchQuery, filterPriority, filterType, onlyCore, onlyAspirational]);
 
   const priorityColors = {
     low: "bg-blue-500/20 text-blue-700 dark:text-blue-300",
@@ -273,20 +296,27 @@ export default function Principles() {
     high: "bg-red-500/20 text-red-700 dark:text-red-300",
   };
 
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 80) return "bg-green-500";
+    if (confidence >= 60) return "bg-yellow-500";
+    if (confidence >= 40) return "bg-orange-500";
+    return "bg-red-500";
+  };
+
   return (
-    <div className="min-h-screen p-8 bg-gradient-subtle">
+    <div className="min-h-screen p-4 md:p-8 bg-gradient-subtle">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
+      <div className="mb-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-2">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-gradient-primary rounded-xl shadow-glow">
               <Star className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-royal bg-clip-text text-transparent">
                 Guiding Principles
               </h1>
-              <p className="text-muted-foreground">Core values and philosophies that guide your work</p>
+              <p className="text-muted-foreground">Define and evolve your guiding principles that anchor all analysis and decisions</p>
             </div>
           </div>
           
@@ -295,7 +325,7 @@ export default function Principles() {
             if (!open) resetForm();
           }}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-primary shadow-royal hover:shadow-glow transition-royal">
+              <Button className="bg-gradient-primary shadow-royal hover:shadow-glow transition-royal rounded-2xl">
                 <Plus className="w-4 h-4 mr-2" />
                 New Principle
               </Button>
@@ -443,9 +473,39 @@ export default function Principles() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mt-4">
+      {/* Search and Filters */}
+      <Card className="mb-6 rounded-2xl">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+              <Input 
+                className="pl-9" 
+                placeholder="Search principles, descriptions, tags…" 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+              />
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Filter className="h-4 w-4"/>
+              <div className="flex items-center gap-2">
+                <Switch id="onlyCore" checked={onlyCore} onCheckedChange={setOnlyCore} />
+                <Label htmlFor="onlyCore" className="text-sm">Core only</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="onlyAsp" checked={onlyAspirational} onCheckedChange={setOnlyAspirational} />
+                <Label htmlFor="onlyAsp" className="text-sm">Aspirational</Label>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Legacy Filters */}
+      <div className="mb-6">
+        <div className="flex flex-wrap gap-2">
           <div className="flex gap-2">
             <Button
               variant={filterType === "all" ? "default" : "outline"}

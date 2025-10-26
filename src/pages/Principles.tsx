@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Plus, Lightbulb, Edit, Trash2, Star, Layers, FileText, FolderOpen, BookOpen, TrendingUp, CheckCircle2, AlertCircle, Search, Filter, Link2, Target, Gauge, Sparkles, MoreHorizontal, Tag } from "lucide-react";
+import { Plus, Lightbulb, Edit, Trash2, Star, Layers, FileText, FolderOpen, BookOpen, TrendingUp, CheckCircle2, AlertCircle, Search, Filter, Link2, Target, Gauge, Sparkles, MoreHorizontal, Tag, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +30,20 @@ type Principle = {
   updated_at: string;
 };
 
+type LinkedItem = {
+  id: string;
+  type: "document" | "project" | "sop";
+  title: string;
+  confidence: number;
+  overridden?: boolean;
+};
+
 type AlignmentStats = {
   documents: number;
   projects: number;
   sops: number;
   avgConfidence: number;
+  linkedItems: LinkedItem[];
 };
 
 export default function Principles() {
@@ -109,26 +118,61 @@ export default function Principles() {
       const stats: Record<string, AlignmentStats> = {};
       
       for (const principle of principles) {
+        const linkedItems: LinkedItem[] = [];
+        
         // Fetch documents aligned to this principle
         const { data: docs } = await supabase
           .from('documents')
-          .select('principle_alignment_score')
+          .select('id, title, principle_alignment_score, user_override')
           .or(`primary_principle_id.eq.${principle.id},linked_principle_id.eq.${principle.id}`);
 
         // Fetch projects aligned to this principle
         const { data: projects } = await supabase
           .from('projects')
-          .select('id')
+          .select('id, name')
           .eq('primary_principle_id', principle.id);
 
         // Fetch SOPs aligned to this principle
         const { data: sops } = await supabase
           .from('sops')
-          .select('id')
+          .select('id, title')
           .eq('linked_principle_id', principle.id);
 
-        const avgConfidence = docs && docs.length > 0
-          ? docs.reduce((sum, doc) => sum + (doc.principle_alignment_score || 0), 0) / docs.length
+        // Add documents to linked items
+        if (docs) {
+          linkedItems.push(...docs.map(doc => ({
+            id: doc.id,
+            type: "document" as const,
+            title: doc.title,
+            confidence: doc.principle_alignment_score || 0,
+            overridden: doc.user_override || false,
+          })));
+        }
+
+        // Add projects to linked items
+        if (projects) {
+          linkedItems.push(...projects.map(proj => ({
+            id: proj.id,
+            type: "project" as const,
+            title: proj.name,
+            confidence: 85, // Default confidence for manual links
+            overridden: false,
+          })));
+        }
+
+        // Add SOPs to linked items
+        if (sops) {
+          linkedItems.push(...sops.map(sop => ({
+            id: sop.id,
+            type: "sop" as const,
+            title: sop.title,
+            confidence: 85, // Default confidence for manual links
+            overridden: false,
+          })));
+        }
+
+        const avgConfidence = linkedItems.length > 0
+          ? linkedItems.reduce((sum, item) => sum + item.confidence, 0) / linkedItems.length
           : 0;
 
         stats[principle.id] = {
@@ -136,18 +180,17 @@ export default function Principles() {
           projects: projects?.length || 0,
           sops: sops?.length || 0,
           avgConfidence: Math.round(avgConfidence),
+          linkedItems,
         };
       }
       
       setAlignmentStats(stats);
     } catch (error: any) {
       toast({
-        title: "Error fetching principles",
+        title: "Error fetching alignment stats",
         description: error.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -503,68 +546,6 @@ export default function Principles() {
         </CardContent>
       </Card>
 
-      {/* Legacy Filters */}
-      <div className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          <div className="flex gap-2">
-            <Button
-              variant={filterType === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterType("all")}
-            >
-              All Types
-            </Button>
-            <Button
-              variant={filterType === "core" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterType("core")}
-            >
-              Core ({principles.filter(p => p.type === 'core').length})
-            </Button>
-            <Button
-              variant={filterType === "aspirational" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterType("aspirational")}
-            >
-              Aspirational ({principles.filter(p => p.type === 'aspirational').length})
-            </Button>
-          </div>
-          
-          <div className="h-8 w-px bg-border" />
-          
-          <div className="flex gap-2">
-            <Button
-              variant={filterPriority === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterPriority("all")}
-            >
-              All Priorities
-            </Button>
-            <Button
-              variant={filterPriority === "high" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterPriority("high")}
-            >
-              High ({principles.filter(p => p.priority === 'high').length})
-            </Button>
-            <Button
-              variant={filterPriority === "medium" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterPriority("medium")}
-            >
-              Medium ({principles.filter(p => p.priority === 'medium').length})
-            </Button>
-            <Button
-              variant={filterPriority === "low" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterPriority("low")}
-            >
-              Low ({principles.filter(p => p.priority === 'low').length})
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* Principles Grid */}
       {loading ? (
         <div className="text-center py-12">
@@ -585,122 +566,170 @@ export default function Principles() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filteredPrinciples.map((principle) => {
-            const stats = alignmentStats[principle.id] || { documents: 0, projects: 0, sops: 0, avgConfidence: 0 };
+            const stats = alignmentStats[principle.id] || { 
+              documents: 0, 
+              projects: 0, 
+              sops: 0, 
+              avgConfidence: 0,
+              linkedItems: []
+            };
             const totalAligned = stats.documents + stats.projects + stats.sops;
             
             return (
-              <Card key={principle.id} className="hover:shadow-card-hover transition-smooth">
-                <CardHeader>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Lightbulb className="w-5 h-5 text-primary" />
-                      <Badge className={priorityColors[principle.priority]}>
-                        {principle.priority}
-                      </Badge>
-                      <Badge variant={principle.type === 'core' ? 'default' : 'secondary'}>
-                        {principle.type === 'core' ? '⭐ Core' : '🎯 Aspirational'}
-                      </Badge>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(principle)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(principle.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <CardTitle className="line-clamp-2">{principle.title}</CardTitle>
-                  {principle.description && (
-                    <CardDescription className="line-clamp-2">
-                      {principle.description}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {principle.content}
-                    </p>
-                    
-                    {/* Alignment Stats */}
-                    <div className="pt-3 border-t space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Alignment</span>
-                        <span className="font-semibold">{totalAligned} items</span>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <FileText className="w-3 h-3" />
-                          <span>{stats.documents} docs</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <FolderOpen className="w-3 h-3" />
-                          <span>{stats.projects} proj</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <BookOpen className="w-3 h-3" />
-                          <span>{stats.sops} SOPs</span>
-                        </div>
-                      </div>
-
-                      {stats.avgConfidence > 0 && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <TrendingUp className="w-3 h-3 text-primary" />
-                          <span className="text-muted-foreground">
-                            AI Confidence: {stats.avgConfidence}%
-                          </span>
-                          {stats.avgConfidence >= 80 ? (
-                            <CheckCircle2 className="w-3 h-3 text-green-500" />
-                          ) : stats.avgConfidence >= 60 ? (
-                            <AlertCircle className="w-3 h-3 text-yellow-500" />
+              <motion.div
+                key={principle.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="h-full"
+              >
+                <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {principle.type === 'core' ? (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-700">Core</Badge>
                           ) : (
-                            <AlertCircle className="w-3 h-3 text-red-500" />
+                            <Badge variant="secondary" className="bg-sky-600 text-white hover:bg-sky-700">
+                              Aspirational
+                            </Badge>
                           )}
+                          <Badge className={priorityColors[principle.priority]}>
+                            {principle.priority}
+                          </Badge>
                         </div>
-                      )}
-                    </div>
-
-                    {/* Tags */}
-                    {principle.tags && principle.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-2">
-                        {principle.tags.slice(0, 3).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {principle.tags.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{principle.tags.length - 3}
-                          </Badge>
+                        <CardTitle className="text-xl">{principle.title}</CardTitle>
+                        {principle.description && (
+                          <CardDescription className="text-sm leading-relaxed">
+                            {principle.description}
+                          </CardDescription>
                         )}
                       </div>
-                    )}
-                    
-                    {principle.category && (
-                      <div className="flex items-center gap-2 text-sm pt-2">
-                        <Layers className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">{principle.category}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="rounded-full">
+                            <MoreHorizontal className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleEdit(principle)}>
+                            <Pencil className="h-4 w-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-red-600" 
+                            onClick={() => handleDelete(principle.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4 flex-1 flex flex-col">
+                    {principle.tags && principle.tags.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {principle.tags.map((t) => (
+                          <Badge key={t} variant="secondary" className="rounded-full">
+                            #{t}
+                          </Badge>
+                        ))}
                       </div>
                     )}
 
-                    <div className="pt-2 text-xs text-muted-foreground">
-                      Updated {new Date(principle.updated_at).toLocaleDateString()}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4" />
+                        <span className="text-muted-foreground">Docs:</span>
+                        <strong>{stats.documents}</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Target className="h-4 w-4" />
+                        <span className="text-muted-foreground">Proj:</span>
+                        <strong>{stats.projects}</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        <span className="text-muted-foreground">SOPs:</span>
+                        <strong>{stats.sops}</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Gauge className="h-4 w-4" />
+                        <span className="text-muted-foreground">Conf:</span>
+                        <strong>{stats.avgConfidence}%</strong>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+
+                    <Tabs defaultValue="alignments" className="flex-1">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="alignments">Alignments</TabsTrigger>
+                        <TabsTrigger value="about">About</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="alignments" className="space-y-3">
+                        {!stats.linkedItems || stats.linkedItems.length === 0 ? (
+                          <div className="text-sm text-muted-foreground py-4">
+                            No alignments yet. They'll appear once documents/projects are analyzed.
+                          </div>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[80px]">Type</TableHead>
+                                <TableHead>Title</TableHead>
+                                <TableHead className="w-[100px]">Conf.</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {stats.linkedItems.slice(0, 5).map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="capitalize text-xs">
+                                    {item.type}
+                                  </TableCell>
+                                  <TableCell className="font-medium text-xs flex items-center gap-1">
+                                    <Link2 className="h-3 w-3" />
+                                    <span className="truncate">{item.title}</span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <Progress className="h-1.5 w-full" value={item.confidence} />
+                                      <span 
+                                        className={`h-2 w-2 rounded-full ${getConfidenceColor(item.confidence)}`} 
+                                      />
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                        {stats.linkedItems && stats.linkedItems.length > 5 && (
+                          <p className="text-xs text-muted-foreground text-center">
+                            +{stats.linkedItems.length - 5} more items
+                          </p>
+                        )}
+                      </TabsContent>
+                      <TabsContent value="about" className="space-y-2">
+                        <p className="text-sm text-muted-foreground line-clamp-4">
+                          {principle.content}
+                        </p>
+                        {principle.category && (
+                          <div className="flex items-center gap-2 text-sm pt-2">
+                            <Layers className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">{principle.category}</span>
+                          </div>
+                        )}
+                        <div className="text-sm text-muted-foreground pt-2">
+                          Last updated {new Date(principle.updated_at).toLocaleString()}.
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              </motion.div>
             );
           })}
         </div>

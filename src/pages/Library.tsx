@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useDocuments, useCreateDocument, useDeleteDocument } from "@/hooks/useDocuments";
+import { useDocuments, useCreateDocument, useDeleteDocument, Document } from "@/hooks/useDocuments";
 import { supabase } from "@/integrations/supabase/client";
 import { extractFileContent, isFileTypeSupported, getFileTypeLabel, formatFileSize, SUPPORTED_FILE_TYPES } from "@/lib/fileParser";
-import { Upload, FileText, Search, Filter, Download, Trash2, X, CheckCircle, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { Upload, FileText, X, CheckCircle, Loader2, Sparkles, AlertCircle, Grid3x3, Network, List } from "lucide-react";
 import { SimpleSkeleton } from "@/components/ui/SimpleSkeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useLibrarySearch } from "@/hooks/useLibrarySearch";
+import { DocumentSearchBar } from "@/components/library/DocumentSearchBar";
+import { DocumentDetailPanel } from "@/components/library/DocumentDetailPanel";
+import { ClusterView } from "@/components/library/ClusterView";
+import { KnowledgeGraph } from "@/components/library/KnowledgeGraph";
+import { formatInTimeZone } from "date-fns-tz";
 
 interface UploadingFile {
   file: File;
@@ -53,6 +59,8 @@ interface UploadingFile {
 
 const categories = ["All", "SOP", "Principle", "Project Note", "General Reference"];
 
+type ViewMode = 'grid' | 'cluster' | 'graph';
+
 export default function Library() {
   const { toast } = useToast();
   const { data: documents, isLoading } = useDocuments();
@@ -60,11 +68,59 @@ export default function Library() {
   const deleteDocument = useDeleteDocument();
   
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedFileType, setSelectedFileType] = useState("All");
   const [principles, setPrinciples] = useState<any[]>([]);
   const [noPrinciples, setNoPrinciples] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+
+  // Use search hook
+  const {
+    filters,
+    updateFilter,
+    filteredDocuments,
+    semanticMode,
+    isSearching,
+    highlightMatches,
+  } = useLibrarySearch(documents);
+
+  // Calculate related documents for detail panel
+  const relatedDocuments = useMemo(() => {
+    if (!selectedDocument || !documents) return [];
+    
+    return documents
+      .filter(doc => doc.id !== selectedDocument.id)
+      .map(doc => {
+        let score = 0;
+        
+        // Same principle (highest weight)
+        if (doc.primary_principle_id === selectedDocument.primary_principle_id && doc.primary_principle_id) {
+          score += 10;
+        }
+        
+        // Same project
+        if (doc.linked_project_id === selectedDocument.linked_project_id && doc.linked_project_id) {
+          score += 8;
+        }
+        
+        // Shared tags
+        const sharedTags = (doc.tags || []).filter(tag => 
+          (selectedDocument.tags || []).includes(tag)
+        );
+        score += sharedTags.length * 3;
+        
+        // Same category
+        if (doc.category === selectedDocument.category) {
+          score += 2;
+        }
+        
+        return { doc, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(({ doc }) => doc);
+  }, [selectedDocument, documents]);
 
   // Fetch principles on mount
   useEffect(() => {
@@ -101,7 +157,7 @@ export default function Library() {
         continue;
       }
 
-      if (file.size > 50 * 1024 * 1024) { // 50MB limit
+      if (file.size > 50 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: `${file.name} exceeds the 50MB size limit`,
@@ -119,7 +175,6 @@ export default function Library() {
 
     setUploadingFiles(prev => [...prev, ...validFiles]);
 
-    // Process each file
     for (let i = 0; i < validFiles.length; i++) {
       await processFile(validFiles[i], uploadingFiles.length + i);
     }
@@ -129,14 +184,11 @@ export default function Library() {
     const { file } = uploadingFile;
     
     try {
-      // Update status to uploading
       updateFileStatus(index, { progress: 10, status: 'uploading' });
 
-      // Get user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Upload to storage
       const filePath = `${user.id}/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('documents')
@@ -146,24 +198,21 @@ export default function Library() {
 
       updateFileStatus(index, { progress: 40, status: 'processing' });
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('documents')
         .getPublicUrl(filePath);
 
-      // Extract content
       const content = await extractFileContent(file);
       
       updateFileStatus(index, { progress: 60, status: 'categorizing' });
 
-      // Call AI categorization with enhanced context
       const { data: aiData, error: aiError } = await supabase.functions.invoke('categorize-document', {
         body: { 
           content, 
           fileName: file.name,
           fileType: file.type,
           userId: user.id,
-          projectId: null // TODO: Add project context if applicable
+          projectId: null
         }
       });
 
@@ -228,7 +277,6 @@ export default function Library() {
         .from('documents')
         .getPublicUrl(filePath);
 
-      // Check if user changed AI suggestion
       const userOverride = 
         editedData.category !== aiSuggestion?.category ||
         editedData.title !== aiSuggestion?.title ||
@@ -254,7 +302,6 @@ export default function Library() {
         user_override: userOverride,
       });
 
-      // Log learning if user made corrections
       if (userOverride && aiSuggestion && result) {
         await supabase.from('ai_learning_log').insert([{
           user_id: user.id,
@@ -272,7 +319,6 @@ export default function Library() {
 
       updateFileStatus(index, { status: 'complete' });
 
-      // Remove after a delay
       setTimeout(() => {
         setUploadingFiles(prev => prev.filter((_, i) => i !== index));
       }, 2000);
@@ -307,29 +353,16 @@ export default function Library() {
     }
   };
 
-  const handleDownload = (doc: any) => {
-    window.open(doc.file_url, '_blank');
-  };
-
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this document?')) {
       await deleteDocument.mutateAsync(id);
     }
   };
 
-  const filteredDocuments = documents?.filter(doc => {
-    const matchesSearch = searchTerm === "" || 
-      doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.summary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesCategory = selectedCategory === "All" || doc.category === selectedCategory;
-    const matchesFileType = selectedFileType === "All" || doc.file_type === selectedFileType;
-    
-    return matchesSearch && matchesCategory && matchesFileType;
-  });
-
-  const uniqueFileTypes = ["All", ...Array.from(new Set(documents?.map(d => d.file_type) || []))];
+  const handleDocumentClick = (doc: Document) => {
+    setSelectedDocument(doc);
+    setDetailPanelOpen(true);
+  };
 
   return (
     <Layout>
@@ -338,19 +371,20 @@ export default function Library() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Document Library</h1>
-              <p className="text-muted-foreground">Every document has purpose and place, flowing from your principles</p>
+              <h1 className="text-3xl font-bold">Document Discovery</h1>
+              <p className="text-muted-foreground">
+                Smart search • Knowledge clustering • Visual connections
+                {semanticMode === false && " • Keyword mode"}
+              </p>
             </div>
           </div>
           
-          {/* Principles CTA */}
           {noPrinciples && (
             <Alert className="border-primary/50 bg-primary/5">
               <Sparkles className="h-4 w-4 text-primary" />
               <AlertDescription className="flex items-center justify-between">
                 <span>
-                  Define your guiding principles to unlock principle-driven categorization. 
-                  The AI will understand your values and help organize documents accordingly.
+                  Define guiding principles to unlock principle-driven categorization and better AI organization.
                 </span>
                 <Button 
                   variant="outline" 
@@ -394,7 +428,6 @@ export default function Library() {
           </CardContent>
         </Card>
 
-        {/* Uploading Files */}
         {uploadingFiles.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Processing Files</h2>
@@ -414,11 +447,7 @@ export default function Library() {
                       </CardDescription>
                     </div>
                     {uploadFile.status === 'reviewing' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRejectDocument(index)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => handleRejectDocument(index)}>
                         <X className="w-4 h-4" />
                       </Button>
                     )}
@@ -441,17 +470,15 @@ export default function Library() {
 
                   {uploadFile.status === 'reviewing' && uploadFile.editedData && (
                     <div className="space-y-4">
-                      {/* No Principles Warning */}
                       {noPrinciples && (
                         <Alert className="border-amber-500/50 bg-amber-500/10">
                           <AlertCircle className="h-4 w-4 text-amber-500" />
                           <AlertDescription>
-                            No guiding principles found. Consider adding principles to help AI understand your organizational values and improve categorization.
+                            No guiding principles found. Consider adding principles to improve categorization.
                           </AlertDescription>
                         </Alert>
                       )}
 
-                      {/* Principle Alignment - STAR Section */}
                       {uploadFile.aiSuggestion?.principle_alignment && (
                         <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20 space-y-3">
                           <div className="flex items-center gap-2">
@@ -488,7 +515,6 @@ export default function Library() {
                         </div>
                       )}
 
-                      {/* Confidence Indicator */}
                       {uploadFile.aiSuggestion?.confidence !== undefined && (
                         <div className={`p-3 rounded-md border ${
                           uploadFile.aiSuggestion.confidence >= 80 
@@ -509,14 +535,10 @@ export default function Library() {
                                uploadFile.aiSuggestion.confidence >= 50 ? 'Medium - Review' : 'Low - Input Needed'}
                             </Badge>
                           </div>
-                          <Progress 
-                            value={uploadFile.aiSuggestion.confidence} 
-                            className="h-2"
-                          />
+                          <Progress value={uploadFile.aiSuggestion.confidence} className="h-2" />
                         </div>
                       )}
 
-                      {/* AI Reasoning */}
                       {uploadFile.aiSuggestion?.reasoning && (
                         <div className="p-3 bg-muted/50 rounded-md">
                           <p className="text-sm font-medium mb-1">AI Reasoning:</p>
@@ -526,7 +548,6 @@ export default function Library() {
                         </div>
                       )}
 
-                      {/* Principle Selection */}
                       {principles.length > 0 && (
                         <div className="space-y-2">
                           <Label>Primary Principle</Label>
@@ -592,49 +613,6 @@ export default function Library() {
                         />
                       </div>
 
-                      {/* Related Items */}
-                      {uploadFile.aiSuggestion?.related_items && (
-                        <div className="p-3 bg-muted/50 rounded-md space-y-2">
-                          <p className="text-sm font-medium">Related Items:</p>
-                          <p className="text-sm text-muted-foreground">
-                            {uploadFile.aiSuggestion.related_items.reasoning}
-                          </p>
-                          {(uploadFile.aiSuggestion.related_items.sop_ids?.length > 0 || 
-                            uploadFile.aiSuggestion.related_items.document_ids?.length > 0) && (
-                            <div className="flex gap-2 flex-wrap mt-2">
-                              {uploadFile.aiSuggestion.related_items.sop_ids?.map(id => (
-                                <Badge key={id} variant="outline">SOP</Badge>
-                              ))}
-                              {uploadFile.aiSuggestion.related_items.document_ids?.map(id => (
-                                <Badge key={id} variant="outline">Doc</Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Suggested Actions */}
-                      {uploadFile.aiSuggestion?.suggested_actions && uploadFile.aiSuggestion.suggested_actions.length > 0 && (
-                        <div className="p-3 bg-accent/10 rounded-md">
-                          <p className="text-sm font-medium mb-2">Suggested Actions:</p>
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            {uploadFile.aiSuggestion.suggested_actions.map((action, i) => (
-                              <li key={i} className="flex items-start gap-2">
-                                <span className="text-accent">→</span>
-                                <span>{action}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {uploadFile.aiSuggestion?.data_description && (
-                        <div className="p-3 bg-muted rounded-md">
-                          <p className="text-sm font-medium mb-1">Data Description:</p>
-                          <p className="text-sm text-muted-foreground">{uploadFile.aiSuggestion.data_description}</p>
-                        </div>
-                      )}
-
                       <div className="flex gap-2 pt-2">
                         <Button onClick={() => handleConfirmDocument(index)} className="flex-1">
                           <CheckCircle className="w-4 h-4 mr-2" />
@@ -666,128 +644,166 @@ export default function Library() {
           </div>
         )}
 
-        {/* Filters */}
-        <div className="flex gap-4 items-center flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search documents..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-[200px]">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map(cat => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedFileType} onValueChange={setSelectedFileType}>
-            <SelectTrigger className="w-[200px]">
-              <FileText className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="File Type" />
-            </SelectTrigger>
-            <SelectContent>
-              {uniqueFileTypes.map(type => (
-                <SelectItem key={type} value={type}>
-                  {type === "All" ? "All Types" : getFileTypeLabel(type)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Search Bar */}
+        <DocumentSearchBar
+          query={filters.query}
+          category={filters.category}
+          principleId={filters.principleId}
+          projectId={filters.projectId}
+          tags={filters.tags}
+          dateRange={filters.dateRange}
+          sortBy={filters.sortBy}
+          onQueryChange={(value) => updateFilter('query', value)}
+          onCategoryChange={(value) => updateFilter('category', value)}
+          onPrincipleChange={(value) => updateFilter('principleId', value)}
+          onProjectChange={(value) => updateFilter('projectId', value)}
+          onTagsChange={(value) => updateFilter('tags', value)}
+          onDateRangeChange={(value) => updateFilter('dateRange', value)}
+          onSortChange={(value) => updateFilter('sortBy', value)}
+        />
+
+        {/* View Mode Toggle */}
+        <div className="flex gap-2 justify-end">
+          <Button
+            variant={viewMode === 'grid' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('grid')}
+          >
+            <Grid3x3 className="w-4 h-4 mr-2" />
+            Grid
+          </Button>
+          <Button
+            variant={viewMode === 'cluster' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('cluster')}
+          >
+            <List className="w-4 h-4 mr-2" />
+            Cluster
+          </Button>
+          <Button
+            variant={viewMode === 'graph' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('graph')}
+          >
+            <Network className="w-4 h-4 mr-2" />
+            Graph
+          </Button>
         </div>
 
-        {/* Documents Grid */}
+        {/* Results Count */}
+        {filteredDocuments.length > 0 && (
+          <div className="text-sm text-muted-foreground">
+            {filteredDocuments.length} {filteredDocuments.length === 1 ? 'document' : 'documents'} found
+            {filters.query && ` for "${filters.query}"`}
+          </div>
+        )}
+
+        {/* Documents View */}
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
-              <SimpleSkeleton key={i} />
+              <SimpleSkeleton key={i} className="h-64" />
             ))}
           </div>
-        ) : filteredDocuments && filteredDocuments.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredDocuments.map(doc => (
-              <Card key={doc.id} className="bg-card hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base flex items-center gap-2 mb-2">
-                        <FileText className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">{doc.title}</span>
-                      </CardTitle>
-                      <div className="flex gap-2 flex-wrap">
-                        {doc.category && <Badge variant="secondary">{doc.category}</Badge>}
-                        <Badge variant="outline" className="text-xs">
-                          {getFileTypeLabel(doc.file_type)}
-                        </Badge>
+        ) : filteredDocuments.length > 0 ? (
+          <>
+            {viewMode === 'grid' && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredDocuments.map(doc => (
+                  <Card 
+                    key={doc.id} 
+                    className="bg-card hover:shadow-lg transition-shadow cursor-pointer"
+                    onClick={() => handleDocumentClick(doc)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base flex items-center gap-2 mb-2">
+                            <FileText className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">{doc.title}</span>
+                          </CardTitle>
+                          <div className="flex gap-2 flex-wrap">
+                            {doc.category && <Badge variant="secondary">{doc.category}</Badge>}
+                            <Badge variant="outline" className="text-xs">
+                              {getFileTypeLabel(doc.file_type)}
+                            </Badge>
+                            {(doc as any)._searchScore && filters.query && (
+                              <Badge variant="secondary" className="text-xs">
+                                {Math.round((doc as any)._searchScore)}% match
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {doc.summary && (
-                    <p className="text-sm text-muted-foreground line-clamp-3">{doc.summary}</p>
-                  )}
-                  
-                  {doc.tags && doc.tags.length > 0 && (
-                    <div className="flex gap-1 flex-wrap">
-                      {doc.tags.map((tag, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {doc.summary && (
+                        <div 
+                          className="text-sm text-muted-foreground line-clamp-3"
+                          dangerouslySetInnerHTML={{ 
+                            __html: highlightMatches(doc.summary, filters.query) 
+                          }}
+                        />
+                      )}
+                      
+                      {doc.tags && doc.tags.length > 0 && (
+                        <div className="flex gap-1 flex-wrap">
+                          {doc.tags.slice(0, 3).map((tag, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {doc.tags.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{doc.tags.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="text-xs text-muted-foreground">
-                    {formatFileSize(doc.file_size)} • {new Date(doc.created_at).toLocaleDateString()}
-                  </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatFileSize(doc.file_size)} • {formatInTimeZone(new Date(doc.created_at), 'Australia/Melbourne', 'PP')}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
 
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleDownload(doc)}
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(doc.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+            {viewMode === 'cluster' && (
+              <ClusterView documents={filteredDocuments} onDocumentClick={handleDocumentClick} />
+            )}
+
+            {viewMode === 'graph' && (
+              <KnowledgeGraph documents={filteredDocuments} onDocumentClick={handleDocumentClick} />
+            )}
+          </>
         ) : (
           <Card className="bg-card">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileText className="w-16 h-16 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No documents found</h3>
               <p className="text-muted-foreground text-center">
-                {searchTerm || selectedCategory !== "All" || selectedFileType !== "All"
-                  ? "Try adjusting your filters"
+                {filters.query || filters.category !== 'All' || filters.principleId !== 'All' || filters.projectId !== 'All' || filters.tags.length > 0
+                  ? "Try adjusting your search or filters"
                   : "Upload your first document to get started"}
               </p>
             </CardContent>
           </Card>
         )}
+
+        {/* Document Detail Panel */}
+        <DocumentDetailPanel
+          document={selectedDocument}
+          relatedDocs={relatedDocuments}
+          open={detailPanelOpen}
+          onOpenChange={setDetailPanelOpen}
+          onDelete={handleDelete}
+          highlightMatches={highlightMatches}
+          searchQuery={filters.query}
+        />
       </div>
     </Layout>
   );
 }
+
